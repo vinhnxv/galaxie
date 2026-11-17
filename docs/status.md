@@ -1,5 +1,23 @@
 # Project status
 
+On 2026-11-17, deterministic ADK Python retry coverage holds a sibling model reply
+until the next attempt: the first attempt leaves one succeeded write receipt,
+and retry reuses it before dispatching the sibling write once in the same Worker.
+Binding run IDs attribute each write to its expected attempt.
+The oracle follows the [core journal contract](system-design.md#83-a-capability-call);
+50 consecutive runs pass and a scratch receipt-reuse mutation repeats write 1 and
+fails the test. MCP Node tests cover the opening SSE parent across later runs
+sharing a session and trace context across a 404 reconnect within one invocation,
+then its removal after settlement. The Node/Chromium trace conformance case groups
+requests by method and controlled boundaries instead of SDK request positions.
+Six MCP scratch mutations are detected; an extra-listing control still passes.
+The 404 test relies on core's suppression after the span ends; the queued-refresh
+tests pin the session layer. The ADK case covers Node and Pyodide with one fixed
+write arrival order and the prebuilt galaxie wheel, and it does not cover a sibling
+tool call that is emitted but not yet dispatched.
+Product behavior and ADR-0012 guarantees are unchanged. No live stack or real
+model was run; the CI-only ADK `invalid` root cause remains unproven.
+
 On 2026-11-17, the Go starter binds wasm, glue and NOTICE consumption to the exact
 verified buffers, includes NOTICE metadata in its manifest, checks unchanged-source
 cache hits against the manifest and rejects local replacements outside its hashed

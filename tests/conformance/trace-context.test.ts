@@ -148,6 +148,7 @@ test('MCP requests share their call parent and queued list_changed refresh has n
   const entered = deferred<void>();
   const release = deferred<void>();
   const notification = deferred<void>();
+  const refreshed = deferred<void>();
   const sent: { method: string; headers: Headers }[] = [];
   const server: McpServer = createMcpServer({
     id: 'trace',
@@ -161,7 +162,8 @@ test('MCP requests share their call parent and queued list_changed refresh has n
           ? (JSON.parse(init.body) as { method: string }).method
           : (init?.method ?? 'GET');
       const headers = new Headers(init?.headers);
-      sent.push({ method, headers: new Headers(headers) });
+      const recordedHeaders = new Headers(headers);
+      sent.push({ method, headers: recordedHeaders });
       // Observe SDK headers before forwarding through the reference server's unchanged CORS policy.
       headers.delete('traceparent');
       headers.delete('tracestate');
@@ -171,6 +173,8 @@ test('MCP requests share their call parent and queued list_changed refresh has n
         await release.promise;
       }
       const response = await fetch(url, { ...init, headers });
+      // Resolve on any refresh so a leaked header fails the assertion, not a timeout.
+      if (method === 'tools/list') refreshed.resolve();
       if (method !== 'GET' || response.body === null) return response;
       const decoder = new TextDecoder();
       let observed = '';
@@ -219,10 +223,12 @@ test('MCP requests share their call parent and queued list_changed refresh has n
   });
   cleanup.push(() => fixture.runtime.dispose());
   const { runId } = await fixture.instance.start('input');
+  let boundary = 0;
   try {
     await entered.promise;
     await admin('description');
     await notification.promise;
+    boundary = sent.length;
   } finally {
     release.resolve();
   }
@@ -230,17 +236,13 @@ test('MCP requests share their call parent and queued list_changed refresh has n
   expect(fixture.scriptErrors).toEqual([]);
   const tool = exporter.getFinishedSpans().find((span) => span.name.startsWith('execute_tool'));
   const parent = `00-${tool?.spanContext().traceId}-${tool?.spanContext().spanId}-01`;
-  expect(
-    sent
-      .filter(({ method }) => ['initialize', 'tools/list', 'tools/call', 'GET'].includes(method))
-      .slice(0, 5)
-      .map(({ headers }) => headers.get('traceparent')),
-  ).toEqual(Array(5).fill(parent));
-  await expect.poll(() => sent.filter(({ method }) => method === 'tools/list').length).toBe(3);
-  expect(
-    sent
-      .filter(({ method }) => method === 'tools/list')
-      .at(-1)
-      ?.headers.has('traceparent'),
-  ).toBe(false);
+  for (const method of ['initialize', 'tools/list', 'tools/call', 'GET']) {
+    const requests = sent.slice(0, boundary).filter((request) => request.method === method);
+    expect(requests.length).toBeGreaterThan(0);
+    for (const { headers } of requests) expect(headers.get('traceparent')).toBe(parent);
+  }
+  await refreshed.promise;
+  const refreshes = sent.slice(boundary).filter(({ method }) => method === 'tools/list');
+  expect(refreshes.length).toBeGreaterThan(0);
+  for (const { headers } of refreshes) expect(headers.has('traceparent')).toBe(false);
 });

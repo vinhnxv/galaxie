@@ -709,6 +709,154 @@ test('a list_changed refresh queued during a broker call carries no settled trac
   expect(refresh?.headers.has('tracestate')).toBe(false);
 });
 
+test('the standalone SSE stream keeps its opening call parent while a later run reuses the session', async () => {
+  const sent: RecordedRequest[] = [];
+  const opened = deferred<void>();
+  const entered = deferred<void>();
+  const release = deferred<void>();
+  const notifications = [deferred<void>(), deferred<void>()];
+  const refreshed = deferred<void>();
+  const streams: { headers: Headers; notifications: number }[] = [];
+  let calls = 0;
+  const { binding, server } = await setup(
+    async (url, init) => {
+      const method = recordRequest(sent, init);
+      if (method === 'tools/call') {
+        await opened.promise;
+        if (++calls === 2) {
+          entered.resolve();
+          await release.promise;
+        }
+      }
+      const response = await originFetch(url, init);
+      // Resolve on any refresh so a leaked header fails the assertion, not a timeout.
+      if (method === 'tools/list') refreshed.resolve();
+      if (method !== 'GET' || response.body === null) return response;
+      const stream = { headers: new Headers(init?.headers), notifications: 0 };
+      streams.push(stream);
+      const decoder = new TextDecoder();
+      let observed = '';
+      const body = response.body.pipeThrough(
+        new TransformStream<Uint8Array, Uint8Array>({
+          transform(chunk, controller): void {
+            observed += decoder.decode(chunk, { stream: true });
+            const count = [...observed.matchAll(/notifications\/tools\/list_changed/g)].length;
+            while (stream.notifications < count) notifications[stream.notifications++]?.resolve();
+            controller.enqueue(chunk);
+          },
+        }),
+      );
+      opened.resolve();
+      return new Response(body, { status: response.status, headers: response.headers });
+    },
+    { destination: 'host-server', propagateTraceContext: true },
+  );
+  const script: Script = async function* ({ capabilities }) {
+    await capabilities.call('mcp.lessons.lesson.lookup@1', { lessonId: 'lesson-1' });
+    yield { type: 'output', output: null };
+  };
+  const first = await traceFixture(binding, script);
+  const { runId: firstRun } = await first.fixture.instance.start('input');
+  expect((await collect(first.fixture.instance.events(firstRun))).at(-1)).toMatchObject({
+    type: 'output',
+  });
+  expect(first.fixture.scriptErrors).toEqual([]);
+  const firstCall = first.exporter
+    .getFinishedSpans()
+    .find((span) => span.name.startsWith('execute_tool'));
+  const firstParent = `00-${firstCall?.spanContext().traceId}-${firstCall?.spanContext().spanId}-01`;
+  expect(streams).toHaveLength(1);
+  expect(streams[0]?.headers.get('traceparent')).toBe(firstParent);
+  await server.admin.changeDescription('lesson.lookup', 'Look up a lesson.');
+  await notifications[0]?.promise;
+  await refreshed.promise;
+
+  const boundary = sent.length;
+  const second = await traceFixture(binding, script);
+  const { runId: secondRun } = await second.fixture.instance.start('input');
+  try {
+    await entered.promise;
+    await server.admin.changeDescription('lesson.lookup', 'Look up a lesson.');
+    await notifications[1]?.promise;
+    // docs/guides/tracing.md: the first GET parents the stream for its whole life.
+    expect(streams).toHaveLength(1);
+    expect(streams[0]?.notifications).toBe(2);
+    expect(streams[0]?.headers.get('traceparent')).toBe(firstParent);
+  } finally {
+    release.resolve();
+  }
+  expect((await collect(second.fixture.instance.events(secondRun))).at(-1)).toMatchObject({
+    type: 'output',
+  });
+  expect(second.fixture.scriptErrors).toEqual([]);
+  const secondCall = second.exporter
+    .getFinishedSpans()
+    .find((span) => span.name.startsWith('execute_tool'));
+  const secondParent = `00-${secondCall?.spanContext().traceId}-${secondCall?.spanContext().spanId}-01`;
+  expect(secondParent).not.toBe(firstParent);
+  const requests = sent.slice(boundary).filter(({ method }) => method === 'tools/call');
+  expect(requests).toHaveLength(1);
+  expect(requests[0]?.headers.get('traceparent')).toBe(secondParent);
+  expect(requests[0]?.headers.get('mcp-session-id')).toBe(
+    streams[0]?.headers.get('mcp-session-id'),
+  );
+  expect(sent.filter(({ method }) => method === 'initialize')).toHaveLength(1);
+  expect(sent.filter(({ method }) => method === 'GET')).toHaveLength(1);
+});
+
+test('a 404 reconnect within one invoke retains its call parent and clears it after settlement', async () => {
+  const sent: RecordedRequest[] = [];
+  const refreshed = deferred<void>();
+  let rejected = false;
+  const { binding, client, events, server } = await setup(
+    async (url, init) => {
+      const method = recordRequest(sent, init);
+      if (method === 'tools/call' && !rejected) {
+        rejected = true;
+        return new Response(null, { status: 404 });
+      }
+      const response = await originFetch(url, init);
+      if (method === 'tools/list' && !new Headers(init?.headers).has('traceparent'))
+        refreshed.resolve();
+      return response;
+    },
+    { destination: 'host-server', propagateTraceContext: true },
+  );
+  const { fixture, exporter } = await traceFixture(binding, async function* ({ capabilities }) {
+    expect(
+      await capabilities.call('mcp.lessons.lesson.lookup@1', { lessonId: 'lesson-1' }),
+    ).toHaveProperty('lessonId', 'lesson-1');
+    yield { type: 'output', output: null };
+  });
+  const { runId } = await fixture.instance.start('input');
+  expect((await collect(fixture.instance.events(runId))).at(-1)).toMatchObject({ type: 'output' });
+  expect(fixture.scriptErrors).toEqual([]);
+  expect(events.filter(({ code }) => code === 'mcp_session_reset')).toHaveLength(1);
+  const tool = exporter.getFinishedSpans().find((span) => span.name.startsWith('execute_tool'));
+  const parent = `00-${tool?.spanContext().traceId}-${tool?.spanContext().spanId}-01`;
+  for (const method of ['initialize', 'GET', 'tools/call'])
+    expect(sent.filter((request) => request.method === method)).toHaveLength(2);
+  expect(server.admin.callCount()).toBe(1);
+  const calls = sent.filter(({ method }) => method === 'tools/call');
+  expect(calls[0]?.headers.get('mcp-session-id')).not.toBe(calls[1]?.headers.get('mcp-session-id'));
+  for (const { headers } of sent) {
+    expect(headers.get('traceparent')).toBe(parent);
+    expect(headers.has('tracestate')).toBe(false);
+    expect(headers.has('baggage')).toBe(false);
+  }
+  const boundary = sent.length;
+  await server.admin.changeDescription('lesson.lookup', 'Look up a lesson.');
+  await refreshed.promise;
+  await client.closePrincipal('test-user');
+  const settled = sent.slice(boundary);
+  expect(settled.some(({ method }) => method === 'tools/list')).toBe(true);
+  for (const { headers } of settled) {
+    expect(headers.has('traceparent')).toBe(false);
+    expect(headers.has('tracestate')).toBe(false);
+    expect(headers.has('baggage')).toBe(false);
+  }
+});
+
 test.each(['error', 'abort'] as const)(
   'clears MCP trace context after a broker call %s',
   async (mode) => {
