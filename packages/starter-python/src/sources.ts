@@ -5,7 +5,6 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { unzipSync } from 'fflate';
 
-/** Check packaged Python modules against the checkout without rebuilding the wheel. */
 export async function verifyWheelSources(
   wheel: { readonly file: string; readonly bytes: Uint8Array },
   sourceDirectory: string,

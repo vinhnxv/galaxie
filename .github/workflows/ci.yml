@@ -208,12 +208,13 @@ jobs:
           pnpm exec tsc -p packages/adapter-kit/tsconfig.build.json
           pnpm exec tsc -p packages/adapter-pyodide/tsconfig.build.json
           pnpm --filter @galaxie-ai/starter-python run prepack
-      - name: Test the Python starter artifacts and Chromium acceptance
-        if: matrix.group == 'python-rest'
+      - name: Test the Python group once
         run: |
-          pnpm run compose:create
-          pnpm exec vitest run --project node tests/conformance/starter-python-*.node.test.ts
-      - run: CI=true pnpm test
+          args=()
+          if [ "$GALAXIE_TEST_GROUP" = "python-rest" ]; then
+            args+=(--no-file-parallelism)
+          fi
+          CI=true pnpm test "${args[@]}"
         env:
           GALAXIE_TEST_GROUP: ${{ matrix.group }}
 

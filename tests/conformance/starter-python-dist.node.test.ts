@@ -339,6 +339,9 @@ test.skipIf(!available)(
     expect(notice).toContain('Mozilla Public License Version 2.0');
     expect(notice).toContain('license to be confirmed by the maintainer');
     expect(notice).toContain('limited same-name stand-in, not upstream');
+    expect(notice).toContain(
+      'Its source header describes it as independently written and says no upstream implementation is included.',
+    );
     expect(notice).toContain('serializer compatibility is unverified');
   },
 );

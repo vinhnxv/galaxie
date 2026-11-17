@@ -6,6 +6,11 @@ LangGraph Python starter wheels and Node build helpers, included in public-packa
 agent source or Pyodide runtime binaries; the manifest records the pinned npm
 runtime's lengths and hashes for the framework overlay.
 
+Prepack checks the runtime version and adapter-declared lengths, then computes
+SHA-256 hashes from the maintainer's installed, pinned npm `pyodide` package.
+These are inventory hashes from that installation, not independent upstream hash
+pins. They rely on the maintainer's package installation and manifest provenance.
+
 The root entry advertises the package version and reads its distribution manifest.
 The `@galaxie-ai/starter-python/build` entry provides `verifyArtifact`,
 `fileMetadata` and `verifyDist`. Release verification compares the distribution to
@@ -38,9 +43,16 @@ LangGraph lane from the adapter's `runtime-files` export and adds exactly the
 truncated or changed wheel fails with its filename and leaves no complete manifest.
 It never repairs the cache. Output is ordinary ignored build output under `dist/`.
 
-Local wheels may be stale if their sources changed after cache preparation.
-Their hashes are recorded, but bit-for-bit reproducibility and compatibility
-with a newer adapter bridge are not established.
+Prepack compares the cached `galaxie` wheel's complete `.py` inventory and bytes
+with `python/galaxie/src`, refusing changed, missing or extra modules with the
+wheel filename and rebuild command. It does not check package metadata or the
+stand-in's source freshness. Bit-for-bit local-wheel reproducibility and
+compatibility with a newer adapter bridge are not established.
+
+Plain `vite dev` watches `python/agent` and invalidates both the served assets
+and virtual source identity after edits, additions and removals. The generated
+`dev` script still builds and previews; rerun it after editing sources.
+`fflate` is a development dependency used only when preparing the distribution.
 
 ## Notices and limits
 
@@ -50,8 +62,10 @@ in `src/notices.ts`. It flags `certifi` MPL-2.0 and the MPL-2.0 text that `orjso
 ships beside Apache/MIT. Both require maintainer review before redistribution.
 
 `ormsgpack` is a limited same-name stand-in, not upstream. Repository metadata
-says Apache-2.0; **license to be confirmed by the maintainer**. It is independently
-written with no copied upstream implementation. Serializer compatibility is
+says Apache-2.0; **license to be confirmed by the maintainer**. Its
+[source header](../../python/standins/ormsgpack/src/ormsgpack/__init__.py) describes
+it as independently written and says no upstream implementation is included.
+Serializer compatibility is
 unverified, and replacing it may make saved checkpoints unreadable. Nothing in
 this package resolves that license or checkpoint-format decision.
 
