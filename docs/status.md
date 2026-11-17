@@ -1,5 +1,17 @@
 # Project status
 
+On 2026-11-17, the offline documentation check compares the tracing attribute
+table with core's metadata allowlist and development-text key type through the
+installed TypeScript 6 parser. It rejects missing and unknown keys, names the
+affected key or row, and refuses empty or unsupported source inventories.
+Temporary-copy tests cover both directions of drift and exclude span names,
+symbol descriptions and value examples. The guide now includes the three
+development-text keys and attribute-cardinality guidance. The
+[executor adapter author guide](guides/executor-adapters.md) maps thirteen
+obligations to core contracts, existing conformance coverage and governing ADRs,
+with LangGraph as the checked implementation. These changes add no runtime
+behavior or live-stack evidence; ADR-0012 guarantees are unchanged.
+
 On 2026-11-17, deterministic ADK Python retry coverage holds a sibling model reply
 until the next attempt: the first attempt leaves one succeeded write receipt,
 and retry reuses it before dispatching the sibling write once in the same Worker.

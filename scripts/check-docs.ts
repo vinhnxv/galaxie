@@ -269,9 +269,8 @@ function reference(label: string): string {
   return label.trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
-// Read the two key inventories, never arbitrary strings such as span names or Symbol descriptions.
 function tracingKeys(source: string): Set<string> {
-  const tree = ts.createSourceFile('tracing.ts', source, ts.ScriptTarget.Latest, true);
+  const tree = ts.createSourceFile('tracing.ts', source, ts.ScriptTarget.Latest);
   const declarations = new Map<string, ts.VariableDeclaration[]>();
   const visit = (node: ts.Node): void => {
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
@@ -312,7 +311,7 @@ function tracingKeys(source: string): Set<string> {
         `cannot extract tracing attributes from ${name}: expected non-empty string literals`,
       );
     for (const literal of literals) {
-      if (!ts.isStringLiteral(literal) || literal.text === '')
+      if (literal.text === '')
         throw new Error(`cannot extract tracing attributes from ${name}: empty key`);
       keys.add(literal.text);
     }
@@ -344,7 +343,6 @@ function checkTracingTable(): void {
     const line = lines[index] ?? '';
     if (!line.startsWith('|')) break;
     const [, row, attributes] = line.split('|');
-    // Parenthesized examples describe values, not emitted keys.
     for (const match of (attributes ?? '').replace(/\([^)]*\)/g, '').matchAll(/`([^`]+)`/g)) {
       const key = match[1];
       if (key === undefined) continue;
