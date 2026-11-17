@@ -66,7 +66,7 @@ export async function buildStarterDist(
     contents.push({ name: wheel.name, version: wheel.version, file: wheel.file, bytes });
   };
   for (const wheel of required) await readWheel(wheel);
-  let local: { v: string; packages: LockedWheel[] };
+  let local: { v: string; packages: LockedWheel[]; pyprojectSha256?: Record<string, string> };
   try {
     local = JSON.parse(
       await readFile(join(wheelCache, 'local-wheels.json'), 'utf8'),
@@ -94,9 +94,15 @@ export async function buildStarterDist(
     permissive: policy.permissive,
     repositoryLicense: await readFile(join(packageDirectory, 'LICENSE'), 'utf8'),
   });
-  const galaxie = contents.find((wheel) => wheel.name === 'galaxie');
-  if (!galaxie) throw new Error('The Python starter galaxie wheel is missing.');
-  await verifyWheelSources(galaxie, join(root, 'python/galaxie/src'));
+  for (const localWheel of local.packages) {
+    const wheel = contents.find((wheel) => wheel.file === localWheel.file);
+    if (!wheel) throw new Error(`The Python starter ${localWheel.name} wheel is missing.`);
+    await verifyWheelSources(
+      { ...wheel, pyprojectSha256: local.pyprojectSha256?.[localWheel.name] },
+      root,
+      localWheel.name === 'galaxie' ? 'python/galaxie' : 'python/standins/ormsgpack',
+    );
+  }
   const adapterPackage = join(root, 'packages/adapter-pyodide/package.json');
   const runtimeDirectory = dirname(createRequire(adapterPackage).resolve('pyodide/package.json'));
   const runtimePackage = JSON.parse(

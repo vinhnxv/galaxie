@@ -31,6 +31,8 @@
   },
   "files": [
     "dist",
+    "!dist/notices.*",
+    "!dist/sources.*",
     "LICENSE",
     "NOTICE"
   ],

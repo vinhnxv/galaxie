@@ -1,5 +1,15 @@
 # Project status
 
+On 2026-11-17, Python starter prepack compares both local wheels' Python modules
+with their repository sources and checks metadata-input hashes recorded by the
+trusted wheel build. Older cache inventories require rebuilding; these hashes
+establish input consistency, not independent metadata reproduction or authenticity.
+The tarball excludes the build-only notices and sources modules. Distribution and
+packing tests pass, and seven scratch mutations are detected. With one unchanged
+wheel cache, all 41 artifact files and 61 published distribution files retain the
+prior implementation's bytes. No live stack was run; ADR-0012 guarantees are
+unchanged.
+
 On 2026-11-17, the offline documentation check compares the tracing attribute
 table with core's metadata allowlist and development-text key type through the
 installed TypeScript 6 parser. It rejects missing and unknown keys, names the

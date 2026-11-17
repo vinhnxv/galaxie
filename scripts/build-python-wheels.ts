@@ -18,20 +18,18 @@ const interpreter = fileURLToPath(
   ),
 );
 const packages = [];
+const pyprojectSha256: Record<string, string> = {};
 for (const [name, version] of [
   ['galaxie', '0.0.0'],
   ['ormsgpack', '1.13.0'],
 ] as const) {
+  const packagePath = `../python/${name === 'galaxie' ? 'galaxie' : 'standins/ormsgpack'}`;
+  const metadata = await readFile(new URL(`${packagePath}/pyproject.toml`, import.meta.url));
   // setuptools reuses a stale build/lib, which would keep deleted or renamed modules in the wheel.
-  await rm(
-    fileURLToPath(
-      new URL(
-        `../python/${name === 'galaxie' ? 'galaxie' : 'standins/ormsgpack'}/build`,
-        import.meta.url,
-      ),
-    ),
-    { recursive: true, force: true },
-  );
+  await rm(fileURLToPath(new URL(`${packagePath}/build`, import.meta.url)), {
+    recursive: true,
+    force: true,
+  });
   const result = spawnSync(
     'uv',
     [
@@ -63,8 +61,9 @@ for (const [name, version] of [
     bytes: bytes.byteLength,
     sha256: createHash('sha256').update(bytes).digest('hex'),
   });
+  pyprojectSha256[name] = createHash('sha256').update(metadata).digest('hex');
 }
 await writeFile(
   new URL('../.cache/python-wheels/local-wheels.json', import.meta.url),
-  `${JSON.stringify({ v: 'galaxie.python-build/v1', packages }, null, 2)}\n`,
+  `${JSON.stringify({ v: 'galaxie.python-build/v1', packages, pyprojectSha256 }, null, 2)}\n`,
 );
