@@ -215,6 +215,46 @@ test.skipIf(!available).each(['missing', 'changed', 'license'] as const)(
   },
 );
 
+test.skipIf(!available).each(['changed', 'missing', 'extra'] as const)(
+  'pack refuses a cached galaxie wheel with %s Python sources even when its inventory agrees',
+  async (mutation) => {
+    const built = await buildStarterDistOnce();
+    const directory = await temporaryDirectory();
+    const pkg = join(directory, 'package');
+    await cp(built.directory, pkg, { recursive: true, dereference: false });
+    const wheelCache = join(directory, 'cache');
+    await mkdir(wheelCache);
+    const local = JSON.parse(await readFile(join(cache, 'local-wheels.json'), 'utf8')) as {
+      packages: { name: string; file: string; bytes: number; sha256: string }[];
+    };
+    for (const wheel of [...selected, ...local.packages])
+      await cp(join(cache, wheel.file), join(wheelCache, wheel.file));
+    const wheel = local.packages.find((item) => item.name === 'galaxie');
+    if (!wheel) throw new Error('The galaxie wheel is missing.');
+    const path = join(wheelCache, wheel.file);
+    const entries = unzipSync(await readFile(path));
+    const source = 'galaxie/_bridge.py';
+    if (mutation === 'missing') delete entries[source];
+    else if (mutation === 'extra') entries['galaxie/removed.py'] = Buffer.from('# Stale module.\n');
+    else entries[source] = Buffer.from('# Stale source.\n');
+    const bytes = zipSync(entries);
+    await writeFile(path, bytes);
+    wheel.bytes = bytes.byteLength;
+    wheel.sha256 = createHash('sha256').update(bytes).digest('hex');
+    await writeFile(
+      join(wheelCache, 'local-wheels.json'),
+      JSON.stringify({ v: 'galaxie.python-build/v1', packages: local.packages }),
+    );
+    await expect(buildStarterDist(pkg, { wheelCache })).rejects.toThrow(
+      `The Python starter wheel does not match python/galaxie/src: ${wheel.file}. Rebuild with: node scripts/build-python-wheels.ts`,
+    );
+    await expect(readFile(join(pkg, 'dist/manifest.json'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    expect(await readFile(path)).toEqual(Buffer.from(bytes));
+  },
+);
+
 const permissive = (
   JSON.parse(await readFile('scripts/dependency-license-allowlist.json', 'utf8')) as {
     permissive: string[];

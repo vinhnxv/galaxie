@@ -37,7 +37,7 @@
   "scripts": {
     "prepack": "pnpm exec tsc -p tsconfig.build.json && node ../../scripts/build-starter-python.ts"
   },
-  "dependencies": {
+  "devDependencies": {
     "fflate": "0.8.3"
   }
 }

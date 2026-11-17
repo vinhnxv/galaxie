@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto';
 import { lstat, readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { LockedWheel } from '@galaxie-ai/adapter-pyodide/runtime-files';
 import type { Plugin, UserConfig } from 'vite';
@@ -158,6 +158,16 @@ export function pythonFramework(projectDirectory: string): UserConfig {
       building = config.command === 'build';
     },
     configureServer(server) {
+      const sourceDirectory = join(projectDirectory, 'python/agent');
+      server.watcher.add(sourceDirectory);
+      server.watcher.on('all', (_event, file) => {
+        const path = relative(sourceDirectory, file);
+        if (path === '..' || path.startsWith(`..${sep}`) || isAbsolute(path)) return;
+        resolved = undefined;
+        const module = server.moduleGraph.getModuleById('\0galaxie-python');
+        if (module !== undefined) server.moduleGraph.invalidateModule(module);
+        server.ws.send({ type: 'full-reload' });
+      });
       server.middlewares.use((request, response, next) => {
         const path = new URL(request.url ?? '/', 'http://localhost').pathname;
         const prefix = `${server.config.base}python/`;

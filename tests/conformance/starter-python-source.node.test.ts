@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { build, type UserConfig } from 'vite';
+import { build, createServer, type UserConfig } from 'vite';
 import { afterAll, afterEach, expect, test } from 'vitest';
 import { validSourcePath } from '../../packages/adapter-pyodide/src/bridge.js';
 import type { StarterManifest } from '../../packages/starter-python/src/manifest.js';
@@ -92,6 +92,42 @@ test('editing an existing underscore-prefixed Python source changes sourceSha256
   const source = join(directory, 'python/agent/starter_agent/__init__.py');
   await writeFile(source, (await readFile(source, 'utf8')) + '\n# Edited existing source.\n');
   expect(digest(await compile(directory))).not.toBe(before);
+});
+
+test('plain Vite dev refreshes edited, added and removed Python assets and source identity', async () => {
+  const directory = await project();
+  const server = await createServer({
+    ...pythonFramework(directory),
+    configFile: false,
+    root: directory,
+    logLevel: 'silent',
+    server: { host: '127.0.0.1', port: 0 },
+  });
+  try {
+    await server.listen();
+    const address = server.httpServer?.address();
+    if (!address || typeof address === 'string') throw new Error('The dev server has no port.');
+    const origin = `http://127.0.0.1:${address.port}`;
+    const asset = '/python/agent/starter_agent/__init__.py';
+    const moduleUrl = '/@id/__x00__galaxie-python';
+    const initial = await (await fetch(origin + asset)).text();
+    const identity = await (await fetch(origin + moduleUrl)).text();
+    const edited = `${initial}\n# Edited while Vite dev is running.\n`;
+    await writeFile(join(directory, 'python/agent/starter_agent/__init__.py'), edited);
+    await expect.poll(async () => (await fetch(origin + asset)).text()).toBe(edited);
+    await expect.poll(async () => (await fetch(origin + moduleUrl)).text()).not.toBe(identity);
+    const added = join(directory, 'python/agent/_added.py');
+    await writeFile(added, '# Added while Vite dev is running.\n');
+    await expect
+      .poll(async () => (await fetch(`${origin}/python/agent/_added.py`)).text())
+      .toBe('# Added while Vite dev is running.\n');
+    await rm(added);
+    await expect
+      .poll(async () => (await fetch(`${origin}/python/agent/_added.py`)).status)
+      .toBe(404);
+  } finally {
+    await server.close();
+  }
 });
 
 test.each(['name', 'version', 'sha256'] as const)(

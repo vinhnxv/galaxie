@@ -27,6 +27,7 @@ export async function buildStarterDist(
     { collectNotices },
     { validArtifact, validFileName },
     { fileMetadata, verifyDist, invalidWheel },
+    { verifyWheelSources },
   ] = await Promise.all([
     import(pathToFileURL(join(dist, 'notices.js')).href) as Promise<
       typeof import('../packages/starter-python/src/notices.js')
@@ -36,6 +37,9 @@ export async function buildStarterDist(
     >,
     import(pathToFileURL(join(dist, 'build.js')).href) as Promise<
       typeof import('../packages/starter-python/src/build.js')
+    >,
+    import(pathToFileURL(join(dist, 'sources.js')).href) as Promise<
+      typeof import('../packages/starter-python/src/sources.js')
     >,
   ]);
   const wheelCache = options.wheelCache ?? join(root, '.cache/python-wheels');
@@ -90,6 +94,9 @@ export async function buildStarterDist(
     permissive: policy.permissive,
     repositoryLicense: await readFile(join(packageDirectory, 'LICENSE'), 'utf8'),
   });
+  const galaxie = contents.find((wheel) => wheel.name === 'galaxie');
+  if (!galaxie) throw new Error('The Python starter galaxie wheel is missing.');
+  await verifyWheelSources(galaxie, join(root, 'python/galaxie/src'));
   const adapterPackage = join(root, 'packages/adapter-pyodide/package.json');
   const runtimeDirectory = dirname(createRequire(adapterPackage).resolve('pyodide/package.json'));
   const runtimePackage = JSON.parse(
