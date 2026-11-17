@@ -164,7 +164,7 @@ test.skipIf(!available).each(['manifest', 'wheel', 'symlink', 'notice'] as const
   },
 );
 
-test.skipIf(!available).each(['missing', 'changed', 'license'] as const)(
+test.skipIf(!available).each(['missing', 'changed', 'bytes-claim', 'license'] as const)(
   'pack checks a local wheel against its cache inventory: %s',
   async (mutation) => {
     const built = await buildStarterDistOnce();
@@ -182,6 +182,7 @@ test.skipIf(!available).each(['missing', 'changed', 'license'] as const)(
     if (!wheel) throw new Error('Missing local wheel.');
     const path = join(wheelCache, wheel.file);
     if (mutation === 'missing') await rm(path);
+    else if (mutation === 'bytes-claim') wheel.bytes += 1;
     else if (mutation === 'changed') {
       const bytes = await readFile(path);
       bytes[0] = (bytes[0] ?? 0) ^ 1;

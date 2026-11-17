@@ -163,6 +163,13 @@ export function pythonFramework(projectDirectory: string): UserConfig {
       server.watcher.on('all', (_event, file) => {
         const path = relative(sourceDirectory, file);
         if (path === '..' || path.startsWith(`..${sep}`) || isAbsolute(path)) return;
+        // Ignore the same noise the source scan skips, so editor and git activity do not reload.
+        if (
+          path
+            .split(sep)
+            .some((part) => ['.git', '.DS_Store', 'node_modules', '__pycache__'].includes(part))
+        )
+          return;
         resolved = undefined;
         const module = server.moduleGraph.getModuleById('\0galaxie-python');
         if (module !== undefined) server.moduleGraph.invalidateModule(module);

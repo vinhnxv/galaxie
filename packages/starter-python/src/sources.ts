@@ -29,7 +29,7 @@ export async function verifyWheelSources(
       const source = await readFile(join(sourceDirectory, path));
       if (!source.equals(entries[path] ?? new Uint8Array())) throw new Error(message);
     }
-  } catch {
-    throw new Error(message);
+  } catch (cause) {
+    throw new Error(message, { cause });
   }
 }

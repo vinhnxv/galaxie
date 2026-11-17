@@ -3,7 +3,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const directory = fileURLToPath(new URL('../.cache/python-wheels/', import.meta.url));
@@ -22,6 +22,16 @@ for (const [name, version] of [
   ['galaxie', '0.0.0'],
   ['ormsgpack', '1.13.0'],
 ] as const) {
+  // setuptools reuses a stale build/lib, which would keep deleted or renamed modules in the wheel.
+  await rm(
+    fileURLToPath(
+      new URL(
+        `../python/${name === 'galaxie' ? 'galaxie' : 'standins/ormsgpack'}/build`,
+        import.meta.url,
+      ),
+    ),
+    { recursive: true, force: true },
+  );
   const result = spawnSync(
     'uv',
     [

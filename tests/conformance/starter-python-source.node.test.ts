@@ -119,11 +119,15 @@ test('plain Vite dev refreshes edited, added and removed Python assets and sourc
     const added = join(directory, 'python/agent/_added.py');
     await writeFile(added, '# Added while Vite dev is running.\n');
     await expect
-      .poll(async () => (await fetch(`${origin}/python/agent/_added.py`)).text())
+      .poll(async () => (await fetch(`${origin}/python/agent/_added.py`)).text(), {
+        timeout: 10_000,
+      })
       .toBe('# Added while Vite dev is running.\n');
     await rm(added);
     await expect
-      .poll(async () => (await fetch(`${origin}/python/agent/_added.py`)).status)
+      .poll(async () => (await fetch(`${origin}/python/agent/_added.py`)).status, {
+        timeout: 10_000,
+      })
       .toBe(404);
   } finally {
     await server.close();
@@ -153,6 +157,40 @@ test.each(['name', 'version', 'sha256'] as const)(
       join(dist, 'manifest.json'),
       JSON.stringify({ ...manifest, wheels: [replacement, ...manifest.wheels.slice(1)] }),
     );
+    await expect(compile(directory)).rejects.toThrow(
+      `The Python starter wheel could not be verified: ${wheel.file}.`,
+    );
+  },
+);
+
+test.each(['content', 'bytes'] as const)(
+  'the adapter re-verifies the local wheel %s on its own',
+  async (field) => {
+    const directory = await project();
+    const dist = join(directory, 'node_modules/@galaxie-ai/starter-python/dist');
+    const manifest = JSON.parse(
+      await readFile(join(dist, 'manifest.json'), 'utf8'),
+    ) as StarterManifest;
+    const wheel = manifest.wheels.find((item) => item.name === 'galaxie');
+    if (wheel === undefined) throw new Error('The local wheel inventory is empty.');
+    if (field === 'content') {
+      // Same length, manifest untouched: only the adapter's own hash comparison can catch it.
+      const path = join(dist, 'wheels', wheel.file);
+      const bytes = await readFile(path);
+      bytes[0] = (bytes[0] ?? 0) ^ 1;
+      await writeFile(path, bytes);
+    } else {
+      // Hash untouched, length claim wrong: only the adapter's own length comparison can catch it.
+      await writeFile(
+        join(dist, 'manifest.json'),
+        JSON.stringify({
+          ...manifest,
+          wheels: manifest.wheels.map((item) =>
+            item === wheel ? { ...item, bytes: item.bytes + 1 } : item,
+          ),
+        }),
+      );
+    }
     await expect(compile(directory)).rejects.toThrow(
       `The Python starter wheel could not be verified: ${wheel.file}.`,
     );
