@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
 import { checkDependencyLicenses } from '../../scripts/check-dependency-licenses.ts';
@@ -88,10 +89,15 @@ test('the real lockfile has a non-empty runtime set including optional launch pe
     'react',
     '@google/adk',
     'pyodide',
-    'fflate',
   ]) {
     expect(output).toContain(`${name}@`);
   }
+  expect(output).not.toContain('fflate@');
+  const starter = JSON.parse(
+    readFileSync(new URL('../../packages/starter-python/package.json', import.meta.url), 'utf8'),
+  ) as unknown;
+  expect(starter).toHaveProperty('devDependencies.fflate', '0.8.3');
+  expect(starter).not.toHaveProperty('dependencies.fflate');
 });
 
 test('the real lockfile passes the dependency license check', () => {

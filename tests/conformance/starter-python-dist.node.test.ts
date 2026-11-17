@@ -9,7 +9,11 @@ import { dirname, join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
 import { lockedWheels, runtimeFiles } from '../../packages/adapter-pyodide/src/runtime-files.js';
 import { collectNotices } from '../../packages/starter-python/src/notices.js';
-import { fileMetadata, verifyDist } from '../../packages/starter-python/src/verify.js';
+import {
+  fileMetadata,
+  verifyArtifact,
+  verifyDist,
+} from '../../packages/starter-python/src/verify.js';
 import { buildStarterDist } from '../../scripts/build-starter-python.js';
 import {
   buildStarterDistOnce,
@@ -37,6 +41,21 @@ afterAll(async () => {
   await cleanStarterDist();
   await Promise.all(temporary.map((directory) => rm(directory, { recursive: true, force: true })));
 });
+
+test.each(['bytes', 'sha256'] as const)(
+  'artifact verification independently checks %s',
+  async (field) => {
+    const directory = await temporaryDirectory();
+    const file = join(directory, 'sample.whl');
+    await writeFile(file, 'original');
+    const expected = { ...(await fileMetadata(file)) };
+    if (field === 'bytes') expected.bytes += 1;
+    else await writeFile(file, 'tampered');
+    await expect(verifyArtifact(file, expected)).rejects.toThrow(
+      'The Python starter wheel could not be verified: sample.whl.',
+    );
+  },
+);
 
 test.skipIf(!available)(
   'packs exactly the adapter LangGraph lane plus both local wheels',
@@ -145,7 +164,7 @@ test.skipIf(!available).each(['manifest', 'wheel', 'symlink', 'notice'] as const
   },
 );
 
-test.skipIf(!available).each(['missing', 'changed', 'license'] as const)(
+test.skipIf(!available).each(['missing', 'changed', 'bytes-claim', 'license'] as const)(
   'pack checks a local wheel against its cache inventory: %s',
   async (mutation) => {
     const built = await buildStarterDistOnce();
@@ -163,6 +182,7 @@ test.skipIf(!available).each(['missing', 'changed', 'license'] as const)(
     if (!wheel) throw new Error('Missing local wheel.');
     const path = join(wheelCache, wheel.file);
     if (mutation === 'missing') await rm(path);
+    else if (mutation === 'bytes-claim') wheel.bytes += 1;
     else if (mutation === 'changed') {
       const bytes = await readFile(path);
       bytes[0] = (bytes[0] ?? 0) ^ 1;
@@ -193,6 +213,46 @@ test.skipIf(!available).each(['missing', 'changed', 'license'] as const)(
     await expect(readFile(join(pkg, 'dist/manifest.json'))).rejects.toMatchObject({
       code: 'ENOENT',
     });
+  },
+);
+
+test.skipIf(!available).each(['changed', 'missing', 'extra'] as const)(
+  'pack refuses a cached galaxie wheel with %s Python sources even when its inventory agrees',
+  async (mutation) => {
+    const built = await buildStarterDistOnce();
+    const directory = await temporaryDirectory();
+    const pkg = join(directory, 'package');
+    await cp(built.directory, pkg, { recursive: true, dereference: false });
+    const wheelCache = join(directory, 'cache');
+    await mkdir(wheelCache);
+    const local = JSON.parse(await readFile(join(cache, 'local-wheels.json'), 'utf8')) as {
+      packages: { name: string; file: string; bytes: number; sha256: string }[];
+    };
+    for (const wheel of [...selected, ...local.packages])
+      await cp(join(cache, wheel.file), join(wheelCache, wheel.file));
+    const wheel = local.packages.find((item) => item.name === 'galaxie');
+    if (!wheel) throw new Error('The galaxie wheel is missing.');
+    const path = join(wheelCache, wheel.file);
+    const entries = unzipSync(await readFile(path));
+    const source = 'galaxie/_bridge.py';
+    if (mutation === 'missing') delete entries[source];
+    else if (mutation === 'extra') entries['galaxie/removed.py'] = Buffer.from('# Stale module.\n');
+    else entries[source] = Buffer.from('# Stale source.\n');
+    const bytes = zipSync(entries);
+    await writeFile(path, bytes);
+    wheel.bytes = bytes.byteLength;
+    wheel.sha256 = createHash('sha256').update(bytes).digest('hex');
+    await writeFile(
+      join(wheelCache, 'local-wheels.json'),
+      JSON.stringify({ v: 'galaxie.python-build/v1', packages: local.packages }),
+    );
+    await expect(buildStarterDist(pkg, { wheelCache })).rejects.toThrow(
+      `The Python starter wheel does not match python/galaxie/src: ${wheel.file}. Rebuild with: node scripts/build-python-wheels.ts`,
+    );
+    await expect(readFile(join(pkg, 'dist/manifest.json'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    expect(await readFile(path)).toEqual(Buffer.from(bytes));
   },
 );
 
@@ -280,6 +340,9 @@ test.skipIf(!available)(
     expect(notice).toContain('Mozilla Public License Version 2.0');
     expect(notice).toContain('license to be confirmed by the maintainer');
     expect(notice).toContain('limited same-name stand-in, not upstream');
+    expect(notice).toContain(
+      'Its source header describes it as independently written and says no upstream implementation is included.',
+    );
     expect(notice).toContain('serializer compatibility is unverified');
   },
 );

@@ -105,6 +105,7 @@ an upstream. Both kinds pass the real-network npm tarball harness on Node 24.15.
 npm 12.2.2 and Chromium 156.0.8078.4 with Python and uv absent from PATH. Generated
 checks and both CSP mutation controls pass; gateway also passes its compiled-server
 503 drive and session probes. See the [measurement record](standalone-verification.md).
+Packing also refuses a cached galaxie wheel whose Python modules differ from `python/galaxie/src` (`.py` files only; the stand-in wheel and non-Python content are not compared), and plain `vite dev` rescans `python/agent` when its files change.
 Startup time and other browser engines are unmeasured.
 The package stays unpublished and outside the launch inventory and
 size budgets; ADR-0012 guarantees are unchanged. See the [package limits](../packages/starter-python/README.md).

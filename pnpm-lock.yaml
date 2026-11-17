@@ -545,7 +545,7 @@ importers:
   packages/starter-go: {}
 
   packages/starter-python:
-    dependencies:
+    devDependencies:
       fflate:
         specifier: 0.8.3
         version: 0.8.3

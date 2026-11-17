@@ -90,6 +90,24 @@ test('create-clean always logs JSON and writes per-project durations without ano
   expect(summary).not.toContain('uses:');
 });
 
+test('python-rest runs the starter files once with the Go step file-parallelism limit', () => {
+  const block = job('test-python');
+  expect(block).not.toContain('tests/conformance/starter-python-*.node.test.ts');
+  expect(block).toContain(`      - name: Test the Python group once
+        run: |
+          args=()
+          if [ "$GALAXIE_TEST_GROUP" = "python-rest" ]; then
+            args+=(--no-file-parallelism)
+          fi
+          CI=true pnpm test "\${args[@]}"
+        env:
+          GALAXIE_TEST_GROUP: \${{ matrix.group }}`);
+  expect([...block.matchAll(/pnpm test/g)]).toHaveLength(1);
+  expect(job('go')).toContain(
+    'pnpm exec vitest run --project node tests/conformance/starter-go-*.node.test.ts --no-file-parallelism',
+  );
+});
+
 test('scope exposes create and both early exits conservatively enable both job groups', () => {
   const block = job('scope');
   expect(block).toContain('create: ${{ steps.scope.outputs.create }}');

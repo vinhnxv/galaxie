@@ -15,7 +15,7 @@ export const reviewFlags: Readonly<Record<string, string>> = {
   orjson:
     'orjson: MPL-2.0 text is shipped beside Apache/MIT and requires maintainer review before redistribution.',
   ormsgpack:
-    'ormsgpack is a limited same-name stand-in, not upstream. Repository metadata says Apache-2.0; license to be confirmed by the maintainer. It is independently written with no copied upstream implementation. Its serializer compatibility is unverified; replacing it may make saved checkpoints unreadable.',
+    'ormsgpack is a limited same-name stand-in, not upstream. Repository metadata says Apache-2.0; license to be confirmed by the maintainer. Its source header describes it as independently written and says no upstream implementation is included. Its serializer compatibility is unverified; replacing it may make saved checkpoints unreadable.',
 };
 
 const aliases: Readonly<Record<string, Readonly<Record<string, string>>>> = {
