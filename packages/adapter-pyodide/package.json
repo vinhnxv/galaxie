@@ -1,7 +1,6 @@
 {
   "name": "@galaxie-ai/adapter-pyodide",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.2.0",
   "description": "Worker-based LangGraph Python executor for galaxie.",
   "license": "Apache-2.0",
   "repository": {

@@ -73,10 +73,11 @@ test.skipIf(!available)(
     await expect(verifyDist(pkg, source)).rejects.toThrow('verified');
     await cp('templates/frameworks/adk-go/files/go/main.go', join(source, 'main.go'));
     const json = JSON.parse(await readFile(join(pkg, 'package.json'), 'utf8'));
+    const originalVersion = json.version;
     json.version = '0.0.1';
     await writeFile(join(pkg, 'package.json'), JSON.stringify(json));
     await expect(verifyDist(pkg, source)).rejects.toThrow('verified');
-    json.version = '0.0.0';
+    json.version = originalVersion;
     await writeFile(join(pkg, 'package.json'), JSON.stringify(json));
     const repoGo = join(dir, 'repository-go');
     await cp('go/go.mod', join(dir, 'go.mod'));

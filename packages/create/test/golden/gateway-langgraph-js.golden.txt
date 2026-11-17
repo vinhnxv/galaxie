@@ -1,4 +1,4 @@
-<!-- galaxie:begin guidance=1 skill=0.1.0 -->
+<!-- galaxie:begin guidance=1 skill=0.2.0 -->
 # Coding with galaxie
 
 Read [the galaxie skill](.agents/skills/galaxie/SKILL.md) and the references present

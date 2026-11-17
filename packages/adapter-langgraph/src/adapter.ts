@@ -43,7 +43,7 @@ export const STREAM_MODES: readonly ['values', 'updates', 'messages', 'custom'] 
 export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGraphServices> {
   return {
     id: 'langgraph-js',
-    version: '0.1.0',
+    version: '0.2.0',
     features: {
       interrupts: true,
       resume: true,

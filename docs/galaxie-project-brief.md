@@ -314,8 +314,10 @@ See ADR-0010 for the cuts and the reasons, and §16 for when each item comes bac
 - Support for every browser, mobile device or GPU. Choose reference configurations and measure first.
 - Third-party MCP servers with OAuth 2.1, and importing OpenAPI operations as capabilities.
 - A "BYOK direct" mode where the browser calls OpenAI or Anthropic with the user's key.
-- A published CLI, json-render and a multi-model pool. A dedicated executor worker too, unless its measured trigger fires during the MVP (§6.2). (Trace export is the host's OpenTelemetry exporter from M1, §14.4.)
+- CLI `add` and `config` commands, json-render and a multi-model pool. A dedicated executor worker too, unless its measured trigger fires during the MVP (§6.2). (Trace export is the host's OpenTelemetry exporter from M1, §14.4.)
 - LLM-composed UI (§11.2) and LLM-chosen tool calls with small local models (§10.6).
+
+The `create` command is no longer deferred: `@galaxie-ai/create` is prepared for the 0.2.0 release, not yet published, with browser-only and gateway React starters for LangGraph.js, ADK JavaScript, ADK Go and LangGraph Python. Registry installs await publication; repository npm tarball verification uses mocks. `add` and `config` stay deferred until developers request them in M4 feedback. Non-React bindings remain deferred until the headless contract is stable through M4.
 
 A2UI surfaces are accepted in [ADR-0027](adr/0027-a2ui-surfaces.md), which lifts the deferral for the one A2UI v1.0 surface format; LLM-composed UI stays deferred.
 
@@ -1319,7 +1321,7 @@ TypeScript strict; pnpm workspaces. Pin the toolchain and versions after checkin
 | `tests/injection-corpus/` | Prompt injection cases for lessons, tool output and MCP descriptions |
 | `docs/adr/` | Architecture decisions, alternatives and evidence |
 
-These are module boundaries, not a demand to publish many npm packages at once. Starting with fewer packages is fine as long as dependency boundaries hold. Do not create empty folders for roadmap items that are not being built. A published CLI is deferred; the MVP generates manifests with a build script.
+These are module boundaries, not a demand to publish many npm packages at once. Starting with fewer packages is fine as long as dependency boundaries hold. Do not create empty folders for roadmap items that are not being built. The create CLI now composes starter layers and is prepared for the 0.2.0 release, not yet published. Agent manifests still use a build script. CLI `add` and `config` remain deferred until developer demand in M4 feedback; non-React bindings wait for the headless contract to stabilize through M4. See the [release guide](releasing.md) for the thirteen-package lockstep inventory and publishing prerequisites.
 
 ## 16. Roadmap
 
@@ -1452,7 +1454,7 @@ Nothing below starts unless the M4 decision is **Go** and the phase's own entry 
 | Second renderer (Vue or Web Components) | Headless contract stable through M4 | Proves the catalog contract is portable |
 | A2UI / MCP Apps / json-render bridge | A host or MCP server needs it | Conformance tests per pinned version |
 | LLM-composed UI | Strong model available for the role; tighter allowlist designed | §11.2 |
-| Published CLI | Developers ask for it in M4 feedback | Trace spans and the host's exporter are M1 work (§14.4) |
+| CLI `add` and `config` | Developers ask for them in M4 feedback | `create` is implemented and prepared for 0.2.0, not yet published; trace spans and the host's exporter are M1 work (§14.4) |
 
 [ADR-0027](adr/0027-a2ui-surfaces.md) proposes lifting the A2UI deferral through a pinned surface format; the other bridges remain deferred.
 

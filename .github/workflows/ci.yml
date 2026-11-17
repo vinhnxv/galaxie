@@ -311,7 +311,7 @@ jobs:
           pnpm exec tsc -p packages/adapter-kit/tsconfig.build.json
           pnpm exec tsc -p packages/adapter-pyodide/tsconfig.build.json
           pnpm --filter @galaxie-ai/starter-python run prepack
-      - name: Build the private create CLI
+      - name: Build the create CLI
         run: pnpm exec tsc -p packages/create/tsconfig.build.json
       - name: Verify both generated kinds in a clean environment
         env:

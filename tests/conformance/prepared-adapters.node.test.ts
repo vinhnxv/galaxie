@@ -23,6 +23,7 @@ function readManifest(directory: string): Manifest {
   ) as Manifest;
 }
 
+const coreVersion = readManifest('packages/core').version;
 const prepared = [
   'adapter-pyodide',
   'adapter-adk',
@@ -84,16 +85,16 @@ function publicationProblems(
   budgets: readonly string[],
 ): string[] {
   const problems: string[] = [];
-  if (manifest.private !== true) problems.push('private');
+  if (manifest.private !== undefined) problems.push('private');
   if (launches.includes(manifest.name)) problems.push('launch');
-  if (budgets.some((entry) => entry.startsWith(`${manifest.name}/`))) problems.push('size-budget');
+  if (!budgets.some((entry) => entry.startsWith(`${manifest.name}/`))) problems.push('size-budget');
   return problems;
 }
 
 test.each(prepared)(
   '$directory advertises its manifest version for every framework',
   ({ directory, manifest }) => {
-    expect(manifest.version).toBe('0.0.0');
+    expect(manifest.version).toBe(coreVersion);
     const advertised = versions[directory] ?? [];
     expect(versionProblems(manifest, advertised)).toEqual([]);
     expect(versionProblems({ ...manifest, version: '0.0.1' }, advertised)).toEqual(['version']);
@@ -115,16 +116,13 @@ test('prepared adapters and both starters declare the same Node floor', () => {
     ).toEqual([entry.directory]);
 });
 
-test('prepared adapters remain private and outside standalone launch and size budgets', () => {
+test('promoted adapters are public and budgeted while standalone extras remain conditional', () => {
   const budget = JSON.parse(
     readFileSync(new URL('../../scripts/size-budget.json', import.meta.url), 'utf8'),
   ) as { entries: Record<string, unknown> };
   const entries = Object.keys(budget.entries);
   for (const { manifest } of prepared) {
     expect(publicationProblems(manifest, launchPackages, entries)).toEqual([]);
-    const { private: omitted, ...withoutPrivate } = manifest;
-    expect(omitted).toBe(true);
-    expect(publicationProblems(withoutPrivate, launchPackages, entries)).toEqual(['private']);
     expect(publicationProblems({ ...manifest, private: false }, launchPackages, entries)).toEqual([
       'private',
     ]);
@@ -132,12 +130,16 @@ test('prepared adapters remain private and outside standalone launch and size bu
       'launch',
     ]);
     expect(
-      publicationProblems(manifest, launchPackages, [...entries, `${manifest.name}/.`]),
+      publicationProblems(
+        manifest,
+        launchPackages,
+        entries.filter((entry) => !entry.startsWith(`${manifest.name}/`)),
+      ),
     ).toEqual(['size-budget']);
   }
 });
 
-test('prepared adapters stay out of the dependency-license launch list', () => {
+test('all promoted packages join the dependency-license list', () => {
   const source = readFileSync(
     new URL('../../scripts/check-dependency-licenses.ts', import.meta.url),
     'utf8',
@@ -145,8 +147,10 @@ test('prepared adapters stay out of the dependency-license launch list', () => {
   const listed = /const launchPackages = \[([^\]]*)\]/.exec(source)?.[1];
   expect(listed).toBeDefined();
   const directories = [...(listed ?? '').matchAll(/'packages\/([^']+)'/g)].map((match) => match[1]);
-  // Positive control: the parser sees the real list before absence is claimed.
+  // The standalone base set stays at seven; the license audit covers all thirteen.
   expect(directories).toContain('core');
-  expect(directories).toHaveLength(7);
-  for (const { directory } of prepared) expect(directories).not.toContain(directory);
+  expect(launchPackages).toHaveLength(7);
+  expect(directories).toHaveLength(13);
+  for (const { directory } of prepared) expect(directories).toContain(directory);
+  expect(directories).toContain('create');
 });

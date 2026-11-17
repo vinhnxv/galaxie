@@ -1,6 +1,8 @@
 # @galaxie-ai/adapter-go
 
-> This package is experimental and is not published to a package registry. Its API can change in any commit without notice.
+Prepared for the 0.2.0 release; not yet published. APIs may change in a 0.x minor release.
+
+After the maintainer publishes, install with `npm install @galaxie-ai/adapter-go@0.2.0`. Until then, use repository-built npm tarballs. Package contents and versions are covered by the thirteen-package pack test; standalone generated-project runs use mocks. Registry installs of 0.2.0, real models and device behavior remain unverified.
 
 The Google ADK (Go) executor adapter (executor id `adk-go`). It runs an agent that the author compiled
 to WebAssembly in a dedicated Worker, after checking the module's length and SHA-256, and keeps policy

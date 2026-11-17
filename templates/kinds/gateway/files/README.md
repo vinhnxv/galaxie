@@ -2,6 +2,10 @@
 
 A copyable Vite + React page and plain `node:http` gateway. The browser runs the same one-question agent as the [local-only starter](https://github.com/vinhnxv/galaxie/blob/main/templates/kinds/browser-only/files/README.md); its `comment` role has exactly one provider, `gateway`, with destination `host-server`. Private system prompts and backend documents stay on the gateway. The upstream model receives the rendered system prompt and the practice request. The browser holds a short-lived demo bearer in memory, never the upstream provider key.
 
+## Release and upgrades
+
+The galaxie packages are prepared for the 0.2.0 lockstep release; 0.2.0 is not yet published. Generated dependencies use `^0.2.0` caret ranges. Until publication, install from maintainer-provided npm tarballs. After publication, upgrade all `@galaxie-ai/*` pins together for a lockstep bump and review the release notes: APIs may change in a 0.x minor release. Repository tarball runs use mocks; historical registry results do not verify 0.2.0 installs. pnpm/yarn tarball mode, real models, devices and non-Linux CI remain unverified.
+
 ## Requirements and running
 
 Use Node.js 24 and npm 12 or later. From this project's directory, use the seven-day release-age policy:
@@ -28,7 +32,7 @@ node .server/server/serve.js
 
 Open `http://127.0.0.1:4173`. This command compiles only the gateway, static server and CSP module into `.server/`. The production entry never imports `server/dev.ts` or `server/mock-upstream.ts`, and neither file is compiled. With no upstream configured it returns `503 {"error":"unavailable"}`. Use this compiled entry for a production-shaped deployment; `vite preview` remains a development convenience and can select the mock. The template declares its own pinned TypeScript, Node and React type tooling, so a copied project can type-check its sources and compile the server without repository-root tools. The static server serves only `dist/`, sends the CSP response header and never falls through from an API route to a file.
 
-The four launch dependencies use exactly `^0.1.0` and resolve from the public npm registry. In repository validation, workspace settings link those ranges locally. Standalone npm installs, production builds, source checks and compiled-server Chromium unavailable flows pass on Node 22.23.5 and 24.15.0 without an upstream; see the [verification record](https://github.com/vinhnxv/galaxie/blob/main/docs/standalone-verification.md) for the initial preview request-abort failure, its loopback-tested correction, and controls and limits. The dev/preview mock flow passes repository browser tests; the network matrix was not rerun after that correction. The declared Node floor is 22.22.2; only those two patch versions were tested. To run the generated checks and compiled server:
+The selected framework uses `^0.2.0` galaxie caret ranges; registry resolution awaits publication. npm tarball mode supplies local file specifications instead. In repository validation, workspace settings link those ranges locally. Standalone npm installs, production builds, source checks and compiled-server Chromium unavailable flows pass on Node 22.23.5 and 24.15.0 without an upstream; see the [verification record](https://github.com/vinhnxv/galaxie/blob/main/docs/standalone-verification.md) for the initial preview request-abort failure, its loopback-tested correction, and controls and limits. The dev/preview mock flow passes repository browser tests; the network matrix was not rerun after that correction. The declared Node floor is 22.22.2; only those two patch versions were tested. To run the generated checks and compiled server:
 
 ```sh
 npm run check
@@ -143,8 +147,8 @@ Tests use the in-process mock or a loopback stub upstream; no real credential or
 
 Choose `--framework adk-go` for the same gateway flow with the prebuilt Go agent
 in a dedicated Worker. See `GO.md` for editing, cache precedence and the Go
-1.27.3 requirement. The private adapter and starter artifacts require local
-npm tarballs until a separate release publishes them. `dev` builds once and then
+1.27.3 requirement. The adapter and starter artifacts are prepared for the
+lockstep release; use local npm tarballs until the maintainer publishes them. `dev` builds once and then
 runs Vite preview; rerun it after Go edits. The Go header matches the existing
 ADK Go recipe's mock header: same-origin scripts and Workers, `wasm-unsafe-eval`,
 required Trusted Types and an allowlisted `default` Worker URL policy. Existing

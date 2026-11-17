@@ -1,6 +1,8 @@
 # @galaxie-ai/adapter-adk
 
-> This package is experimental and is not published to a package registry. Its API can change in any commit without notice.
+Prepared for the 0.2.0 release; not yet published. APIs may change in a 0.x minor release.
+
+After the maintainer publishes, install with `npm install @galaxie-ai/adapter-adk@0.2.0`. Until then, use repository-built npm tarballs. Package contents and versions are covered by the thirteen-package pack test; standalone generated-project runs use mocks. Registry installs of 0.2.0, real models and device behavior remain unverified.
 
 The Google ADK (JavaScript) executor adapter (executor id `adk-js`). It pins ADK, runs its
 browser bundle under galaxie's strict CSP and Trusted Types, and hosts agents through galaxie's
@@ -266,8 +268,9 @@ models, device measurements and Worker-hosted JavaScript remain unmeasured.
 
 ## Install
 
-This is a private workspace package. With Node 24 and pnpm 11, run
+For checkout development with Node 24 and pnpm 11, run
 `pnpm install --frozen-lockfile` and `pnpm build` at the repository root.
+After publication, use `npm install @galaxie-ai/adapter-adk@0.2.0`; until then, use npm tarballs.
 [package.json](package.json) pins `@google/adk` exactly to 2.3.0, with `@langchain/core` and
 `zod` as peers.
 

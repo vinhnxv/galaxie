@@ -1,8 +1,8 @@
 # Editing the Go agent
 
-The unedited agent runs from the private `@galaxie-ai/starter-go` prebuilt artifact.
+The unedited agent runs from the `@galaxie-ai/starter-go` prebuilt artifact.
 Running it needs Node and npm, without Go. The starter package and Go adapter are
-unpublished; install from the maintainer-provided npm tarballs.
+prepared for the lockstep release and not yet published; install from the maintainer-provided npm tarballs.
 
 Run `npm run dev` to build, then preview at `http://127.0.0.1:4173` under the strict
 CSP and Trusted Types headers. There is no watch or HMR mode. Stop preview and run

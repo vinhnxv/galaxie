@@ -1,56 +1,102 @@
 # Releasing galaxie
 
-The first release is 0.1.0. Publishing is a manual maintainer step.
-
-The seven launch packages are `@galaxie-ai/ui-protocol`, `@galaxie-ai/core`,
-`@galaxie-ai/adapter-kit`, `@galaxie-ai/adapter-langgraph`,
-`@galaxie-ai/models`, `@galaxie-ai/storage-indexeddb` and `@galaxie-ai/react`. All other
-packages stay private and unpublished.
+The next lockstep release is 0.2.0 across thirteen packages. This branch prepares
+it; nothing is published and no tag or release is created by the preparation.
+Publishing, tagging and release notes are manual maintainer steps.
+`eslint-plugin` and `tools-mcp` remain private. The registry currently has 0.1.0
+of the seven launch packages and none of the six promoted packages. Registry
+installs of 0.2.0 remain unverified until the maintainer publishes it.
 
 ## Versioning
 
-Keep `skills/galaxie/SKILL.md` frontmatter `version` equal to `packages/core/package.json` when bumping a release; regenerate the create guidance goldens.
+Versions are `0.MINOR.PATCH`. While the major version is 0, a breaking public API
+change may land in a minor release and must be called out in the release notes.
+A patch release does not break a public API. All thirteen packages in the publish
+order below share one version and are released together. pnpm rewrites their
+internal `workspace:*` dependencies to that exact version when packing.
+Generated projects retain caret ranges such as `^0.2.0`; upgrade all
+`@galaxie-ai/*` ranges together for a lockstep bump.
 
-Versions are `0.MINOR.PATCH`. While the major version is 0, a breaking change to a
-public API may land in a minor release and must be called out in the release
-notes. A patch release does not break a public API. The seven launch packages share
-one version number and are released together, because `@galaxie-ai/adapter-langgraph`,
-`@galaxie-ai/adapter-kit` and `@galaxie-ai/react` depend on the exact `@galaxie-ai/core`
-version of the same release; the LangGraph adapter also depends on the kit.
-`@galaxie-ai/ui-protocol` has no galaxie dependencies and no hand-written package-version
-constant. Its spec pin constants are not the package version. Core and React depend on its
-exact release version after packing. The A2UI renderer is a breaking change to the
-launch React package's public surface API and must land in a 0.x minor release.
-Publish order remains protocol first, then core, then the dependent packages.
+Update all thirteen package manifests, plus:
+
+- `packages/core/src/version.ts` and the advertised adapter versions in
+  `packages/adapter-{langgraph,pyodide,adk,go}/src/adapter.ts`.
+- The exported versions in `packages/starter-go/src/index.ts` and
+  `packages/starter-python/src/index.ts`.
+- `skills/galaxie/SKILL.md` frontmatter, equal to core's version, and its README example.
+- The galaxie ranges in `templates/**/layer.json` and any current generated-project
+  documentation that names them. Regenerate and review create guidance goldens;
+  version and pin conformance tests derive their expectations from manifests.
+- Current release documentation and upgrade notes. Preserve dated historical
+  measurements, agent-definition versions, protocol pins and Go module versions.
+
+`ui-protocol` has no hand-written package-version constant; its specification pins
+are independent of its package version. Starter artifacts embed their package
+version: run each starter's `prepack` after a bump, before tests read its `dist`.
+Use Go 1.27.3 on PATH for the Go starter and the prepared wheel cache for Python.
+Commit the coordinated bump with `git commit -s`.
+
+## Publish order
+
+Dependencies must precede their consumers, as derived from public package
+manifests. The additional release policy is explicit: **starters and adapters
+before create, create last**, because generated framework layers select these
+packages without create having runtime dependencies on them. The conformance
+test checks the complete public inventory, dependency edges and this policy.
+
+1. `@galaxie-ai/ui-protocol`
+2. `@galaxie-ai/core`
+3. `@galaxie-ai/adapter-kit`
+4. `@galaxie-ai/adapter-langgraph`
+5. `@galaxie-ai/models`
+6. `@galaxie-ai/storage-indexeddb`
+7. `@galaxie-ai/react`
+8. `@galaxie-ai/adapter-pyodide`
+9. `@galaxie-ai/adapter-adk`
+10. `@galaxie-ai/adapter-go`
+11. `@galaxie-ai/starter-go`
+12. `@galaxie-ai/starter-python`
+13. `@galaxie-ai/create`
+
+## Create packaging
+
+The create tarball ships `dist`, `templates`, `skills`, `LICENSE` and `NOTICE`,
+plus npm's included README and manifest. Prepack copies repository templates and
+the galaxie skill into ignored package directories; postpack removes the copies.
+`pnpm --filter @galaxie-ai/create run clean:pack` also removes them after an
+interrupted pack. The CLI tries packaged assets first and falls back to checkout
+sources. The isolated packed-create test runs help and a `--no-install` scaffold
+with only Node on PATH and compares every generated file with checkout output.
+Tarball dependency resolution supports npm only; pnpm and yarn remain refused.
+
+## Verification evidence and limits
+
+Repository `create-clean` CI covers npm tarballs for all eight kind/framework
+combinations on Ubuntu Node 24 and both LangGraph.js kinds on Node 22. The pack
+test inspects thirteen packages, and the isolated packed-create test runs help
+and scaffolding outside the checkout. [Standalone runs](standalone-verification.md)
+record local mock-backed results. New-release registry installs, real models,
+devices, pnpm/yarn tarball mode and non-Linux CI remain unverified.
 
 ## Prepared adapters
 
-`@galaxie-ai/adapter-pyodide`, `@galaxie-ai/adapter-adk` and `@galaxie-ai/adapter-go`
-have package metadata, root license files and pack conformance coverage, but stay
-`private: true` at `0.0.0`, outside the seven launch packages and size budgets.
-The Python adapter also exposes `./runtime-files` for its runtime and wheel inventories.
-Their declared Node floor, `>=22.22.2`, matches the starters; these adapters have
-not been measured at that floor.
+The three additional adapters are prepared for the 0.2.0 lockstep release.
+The Python adapter exposes `./runtime-files` for runtime and wheel inventories.
+Its vendored `cryptography` wheel URL is repository-relative
+(`../python/wheels/...`), so direct registry consumers cannot resolve it from the
+installed adapter alone. They must arrange hosting and wheel URLs themselves;
+this preparation does not resolve that distribution limit. Generated LangGraph
+Python projects obtain their wheels from `starter-python` instead.
 
-Promotion requires a lockstep version bump of manifests and adapter constants,
-removal of `private`, membership in the pack, standalone and dependency-license
-launch lists, size budgets for every export (including Python's `./runtime-files`
-and `./worker`), updated release package lists and publish order, README install
-instructions and removal of the experimental/unpublished banners. Before
-publication, decide how consumers obtain the vendored `cryptography` wheel:
-its inventory URL is repo-relative (`../python/wheels/...`) and does not resolve
-from an installed registry package. This preparation leaves that inventory unchanged.
-
-## Private create tooling
-
-[`@galaxie-ai/create`](../packages/create/README.md) stays private and unpublished
-at `0.0.0`, outside the seven launch packages, pack tests and size budgets. Its
-CLI loads layers from this checkout; the standalone harness uses that built CLI
-with `--no-install`, then installs and checks each generated project itself.
-Tarball mode supports npm only and refuses pnpm and yarn. Publishing the create
-package and packaging its layers require separate follow-up work.
-
-Add the clean-environment registry CI run and its schedule when the first release exists for that workflow.
+The Python starter's limited same-name `ormsgpack` stand-in has an unconfirmed
+license and unverified checkpoint serializer compatibility. Its certifi/orjson
+MPL-2.0 texts and the adapter's unmodified registry `pyodide` MPL-2.0 exception
+require maintainer review before redistribution. The dependency-license gate's
+exception records the file-level weak-copyleft rationale; it does not replace
+that review. **Record the Python starter license review before publishing
+`starter-python`. The whole lockstep release waits for it**, because create's
+`langgraph-python` layer depends on that starter; omitting it breaks registry
+installation for that framework.
 
 ## Size budgets
 
@@ -69,68 +115,93 @@ pnpm run build:packages && node scripts/check-size.ts --write
 
 Generation preserves `marginPercent` (10 percent initially), adds that margin to
 each measurement and rounds each limit up to the next 100 bytes. Review deliberate
-growth in the diff of `scripts/size-budget.json` before committing it, and rerun
-`pnpm run check:size`. Do not regenerate the budget merely to clear a failed check.
-Use the pinned Vite version; changes to the bundler or platform can affect output
-and require reviewing the measurements again.
+growth in the diff before committing and rerun `pnpm run check:size`. Do not
+regenerate merely to clear a failed check. Use the pinned Vite version; bundler
+or platform changes can affect output and require reviewing measurements again.
 
 ## Maintainer-only prerequisites
 
-The maintainer must provide an npm account with permission to publish under the
-`@galaxie-ai` scope, with two-factor authentication enabled. The repository is already
-public. These are maintainer-only steps.
+Start from green `main` after the release-preparation pull request has merged.
+The release commit must have no uncommitted edits. Require green `pnpm check`, all
+five `create-clean` CI legs with `success` (not skipped), and every other CI job.
+Record the Python starter license review above before beginning the whole release.
+The maintainer needs an npm account permitted to publish under `@galaxie-ai`,
+with two-factor authentication enabled. The repository is already public.
 
 ## Manual publish steps
 
-1. Start from a green `main`.
-2. Bump the version in all seven launch package manifests to the same release version,
-   and set the same version in `packages/core/src/version.ts` and in the adapter object
-   in `packages/adapter-langgraph/src/adapter.ts`. Core reports its constant as the
-   instrumentation scope version and the adapter advertises its own, and tests fail
-   when either differs from its manifest. Commit the bump with `git commit -s`, merge
-   it through a pull request, and check out the merged commit. That commit is the
-   release commit: everything below publishes and tags it, with no uncommitted edits.
-3. Run `pnpm install --frozen-lockfile`, then `pnpm check`.
-4. Run `pnpm run build`. Before publishing, verify generated starters against packed
-   workspace packages with Node 22 and 24 installed locally, using npm 12 on PATH:
+1. Check out the reviewed release commit on green `main`. Confirm all thirteen
+   manifests and their constants are 0.2.0 and the prerequisites above are met.
+2. Run `pnpm install --frozen-lockfile`, rebuild both starters through `prepack`,
+   then run `pnpm check` with Go 1.27.3 on PATH. Run `pnpm run build`.
+3. Verify generated projects against packed workspace packages with Node 22 and
+   24 installed locally and npm 12 on PATH:
 
    ```sh
-   node scripts/verify-standalone.ts --node 22 --node 24 --mode tarball --json /tmp/galaxie-standalone-tarball.json
+   node scripts/verify-standalone.ts --node 22 --node 24 --mode tarball --clean-path --json /tmp/galaxie-standalone-tarball.json
    ```
 
-   Review the matrix and all gating failures as described in the
-   [standalone verification record](standalone-verification.md). The harness never
-   publishes; tarballs and generated projects are temporary. Each project must
-   pass `npm run check`, and both CSP mutation controls must reject the loosened
-   directive before its original source is restored.
-5. Run `pnpm pack` in each launch package directory and inspect each tarball. It
-   must contain `dist`, `LICENSE`, `NOTICE`, `README.md` and `package.json`, with no
-   `src`, tests or internal files. No `workspace:` reference may remain in the
-   packed manifest.
-   The Node package-pack conformance test also reports minified and gzip bytes
-   for the kit and the LangGraph consumer with the kit bundled in. Record both
-   measurements with the release evidence. These consumer-bundle demonstrations
-   differ from the own-code CI budgets above and do not establish a size saving.
-6. Publish `@galaxie-ai/ui-protocol` first, then `@galaxie-ai/core`, then `@galaxie-ai/adapter-kit`,
-   then the other four launch packages, running `pnpm publish --access public` in each
-   package directory.
-   pnpm rewrites each `workspace:` reference to the exact dependency version when
-   it packs and does not check the registry, so a package published before its
-   dependencies installs only once those are published. That is why the order matters.
-7. After all seven packages are published, run the public-registry check:
+   Repeat with `--framework adk-js`, `--framework adk-go` and
+   `--framework langgraph-python`. Review every gating failure and the limits in
+   the [standalone verification record](standalone-verification.md). Generated
+   checks and both CSP mutation controls must pass. The harness never publishes.
+4. Run `pnpm pack --pack-destination "$(mktemp -d)"` in each of the thirteen
+   package directories (never leave tarballs in the working tree, because
+   `pnpm publish` requires a clean tree) and inspect the tarballs. Require `dist`, `LICENSE`, `NOTICE`, `README.md` and `package.json`,
+   with no top-level `src`, tests or internal files. Create additionally ships
+   its templates and skill trees, including source and tests used to generate
+   projects. Require matching versions, exact internal dependencies and no
+   remaining `workspace:` references. Run the package-pack and isolated
+   packed-create conformance tests. Record the kit and LangGraph consumer's
+   minified/gzip bundle measurements; these include the kit and differ from the
+   own-code size budgets, so they do not establish a size saving.
+5. Make the release commit. Several files that ship in the tarballs, and the
+   generated-project READMEs, describe the release as prepared and not yet
+   published: the six promoted package READMEs, `packages/create/README.md`,
+   `templates/kinds/browser-only/files/README.md`,
+   `templates/kinds/gateway/files/README.md`,
+   `templates/frameworks/adk-go/files/GO.md`,
+   `templates/frameworks/langgraph-python/files/PYTHON.md` and
+   `skills/galaxie/README.md`. Reword each to state that 0.2.0 is published
+   (registry installs replace the maintainer-provided tarball instructions),
+   update the sentence the installer test asserts in
+   `tests/conformance/skill-install.node.test.ts`, regenerate the create
+   guidance goldens and the composed-output hashes if their text changed, and
+   merge that commit through a pull request. Publish only from the merged commit,
+   and rerun step 2 on it.
+6. Publish each package in the exact order above, running
+   `pnpm publish --access public` in its package directory. This is a maintainer
+   action, never part of the preparation scripts. Publishing before dependencies
+   makes installations fail until those dependencies exist in the registry.
+7. Perform the post-publish checks below before tagging. Record any failures.
+   If a publish fails part-way, do not unpublish: fix the cause and continue the
+   remaining packages in order at the same version.
+8. The maintainer tags the same release commit `v0.2.0` and pushes that tag only
+   after all thirteen packages and post-publish checks are verified.
+9. The maintainer writes English release notes and creates the release, naming
+   all thirteen packages, breaking public API changes, the new `engines.node`
+   floor on the seven launch packages, coordinated upgrade ranges, tarball evidence, license review and documented verification limits.
 
-   ```sh
-   node scripts/verify-standalone.ts --node 22 --node 24 --mode registry --json /tmp/galaxie-standalone-registry.json
-   ```
+## Post-publish checks
 
-   The seven-day release-age policy normally requires waiting for a new release
-   to age. If deliberately verifying it sooner, explicitly pass
-   `--min-release-age-exclude '@galaxie-ai/*'` and retain that recorded exclusion
-   with the release evidence. Do not change user npm configuration. Record any
-   remaining failure before tagging; see the verification record for limits.
-8. Tag the release commit `v<version>` and push the tag.
-9. Write release notes in English, including any breaking public API changes.
+Check `npm view @galaxie-ai/<package>@0.2.0 version` for every package in the
+publish order and inspect the registry manifests for matching versions, exact
+internal dependencies, public access, exports and create's bin. Run
+`npm create @galaxie-ai@0.2.0 -- --help` outside the checkout.
 
+Run the public-registry LangGraph JavaScript check:
+
+```sh
+node scripts/verify-standalone.ts --node 22 --node 24 --mode registry --clean-path --json /tmp/galaxie-standalone-registry.json
+```
+
+The seven-day release-age policy normally requires waiting for a release to age.
+If deliberately checking sooner, pass `--min-release-age-exclude '@galaxie-ai/*'`
+explicitly and retain that recorded exclusion with the evidence. Do not relax
+`minimumReleaseAge` or change user npm configuration. The other three frameworks
+remain tarball-only in this harness; registry installation of their generated
+projects requires separate evidence before claiming it verified. A scheduled
+registry CI run remains follow-up work once this release exists for the workflow.
 Manual publishing from a laptop has no provenance attestations.
 
 See [the license and DCO decision](adr/0024-apache-2-0-license-and-dco.md).

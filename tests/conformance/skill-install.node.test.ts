@@ -21,6 +21,9 @@ import { pythonAffected } from '../../scripts/ci-scope.js';
 import { install } from '../../scripts/install-skill.js';
 
 const source = fileURLToPath(new URL('../../skills/galaxie/', import.meta.url));
+const skillVersion = /^version: (.+)$/m.exec(await readFile(join(source, 'SKILL.md'), 'utf8'))![1]!;
+const [major, minor] = skillVersion.split('.').map(Number);
+const mismatchVersion = `${major}.${minor! + 1}.0`;
 const script = fileURLToPath(new URL('../../scripts/install-skill.ts', import.meta.url));
 
 test('guidance Markdown stays Python-independent while the unknown installer path runs Python jobs', () => {
@@ -33,7 +36,7 @@ test('guidance Markdown stays Python-independent while the unknown installer pat
   expect(pythonAffected(['scripts/install-skill.ts'])).toBe(true);
 });
 
-async function app(version: string | undefined = '0.1.0'): Promise<string> {
+async function app(version: string | undefined = skillVersion): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), 'galaxie-skill-'));
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
   await writeFile(
@@ -95,7 +98,7 @@ test('installs identical real files in both skill directories and preserves app 
   expect(await tree(directory)).toEqual(installed);
 });
 
-test.each(['0.2.0', '^0.1.0', 'workspace:*', 'missing'])(
+test.each([mismatchVersion, `^${skillVersion}`, 'workspace:*', 'missing'])(
   'refuses %s core without writing',
   async (version) => {
     const directory = await app(version === 'missing' ? undefined : version);
@@ -103,7 +106,7 @@ test.each(['0.2.0', '^0.1.0', 'workspace:*', 'missing'])(
     const before = await tree(directory);
     const result = spawnSync(process.execPath, [script, directory], { encoding: 'utf8' });
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('skill=0.1.0');
+    expect(result.stderr).toContain(`skill=${skillVersion}`);
     expect(result.stderr).toContain('core=');
     expect(await tree(directory)).toEqual(before);
     expect(await readdir(directory)).toEqual(['package.json']);
@@ -111,14 +114,16 @@ test.each(['0.2.0', '^0.1.0', 'workspace:*', 'missing'])(
 );
 
 test('installed core takes precedence over the declared dependency and explicit override', async () => {
-  const directory = await app('^0.1.0');
+  const directory = await app(`^${skillVersion}`);
   const core = join(directory, 'node_modules/@galaxie-ai/core');
   await mkdir(core, { recursive: true });
-  await writeFile(join(core, 'package.json'), '{"version":"0.2.0"}');
+  await writeFile(join(core, 'package.json'), JSON.stringify({ version: mismatchVersion }));
   const before = await tree(directory);
-  expect(() => install(directory, { coreVersion: '0.1.0' })).toThrow('core=0.2.0');
+  expect(() => install(directory, { coreVersion: skillVersion })).toThrow(
+    `core=${mismatchVersion}`,
+  );
   expect(await tree(directory)).toEqual(before);
-  await writeFile(join(core, 'package.json'), '{"version":"0.1.0"}');
+  await writeFile(join(core, 'package.json'), JSON.stringify({ version: skillVersion }));
   install(directory);
   expect(await readFile(join(directory, '.agents/skills/galaxie/SKILL.md'))).toEqual(
     await readFile(join(source, 'SKILL.md')),
@@ -126,8 +131,8 @@ test('installed core takes precedence over the declared dependency and explicit 
 });
 
 test('explicit core version supports a hoisted app with a dependency range', async () => {
-  const directory = await app('^0.1.0');
-  const result = spawnSync(process.execPath, [script, directory, '--core-version', '0.1.0'], {
+  const directory = await app(`^${skillVersion}`);
+  const result = spawnSync(process.execPath, [script, directory, '--core-version', skillVersion], {
     encoding: 'utf8',
   });
   expect(result.status, result.stderr).toBe(0);
@@ -207,7 +212,7 @@ test('skill version follows core, instructs comparison and documents the absent 
   expect(skill).toContain("compare this skill's `version`");
   expect(skill).toContain('Stop on a mismatch');
   const readme = await readFile(join(source, 'README.md'), 'utf8');
-  expect(readme).toContain('No release tag exists yet');
+  expect(readme).toContain(`\`v${core.version}\` does not exist until the maintainer creates it.`);
   expect(readme).toContain('22.18');
 });
 

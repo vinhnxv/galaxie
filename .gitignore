@@ -35,6 +35,8 @@ dist-pages/
 
 # Generated starter projects for create-package tests.
 /packages/create/.cache/
+/packages/create/templates/
+/packages/create/skills/
 
 # Next.js generated output and environment declarations.
 /examples/nextjs-app-router/.next*/

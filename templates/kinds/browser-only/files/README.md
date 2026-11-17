@@ -2,6 +2,10 @@
 
 A copyable Vite + React app with its own tiny agent: answer one multiple-choice question, then receive a short model comment. It has no agent backend, remote model endpoint, provider key or tracing exporter. Inference stays in the browser. Model assets require a network connection only after an explicit WebLLM download opt-in.
 
+## Release and upgrades
+
+The galaxie packages are prepared for the 0.2.0 lockstep release; 0.2.0 is not yet published. Generated dependencies use `^0.2.0` caret ranges. Until publication, install from maintainer-provided npm tarballs. After publication, upgrade all `@galaxie-ai/*` pins together for a lockstep bump and review the release notes: APIs may change in a 0.x minor release. Repository tarball runs use mocks; historical registry results do not verify 0.2.0 installs. pnpm/yarn tarball mode, real models, devices and non-Linux CI remain unverified.
+
 ## Requirements and running
 
 Use Node.js 24 and npm 12 or later. The mock needs no GPU or model download. Persistent browser sessions need IndexedDB, Web Locks and BroadcastChannel on a trustworthy origin such as localhost. Built-in AI needs a browser with the English Prompt API model already available. WebLLM needs a compatible WebGPU adapter, including `shader-f16`, and enough memory; detecting `navigator.gpu` alone does not prove those requirements.
@@ -13,7 +17,7 @@ npm install --min-release-age=7 --registry=https://registry.npmjs.org/
 npm run dev
 ```
 
-The five `@galaxie-ai/*` dependencies resolve from the public npm registry. The Vite config uses package exports, with no aliases into the galaxie checkout. The standalone `tsconfig.json` keeps the repository's strict compiler options, and the project declares its own TypeScript and Node/React types. Repository validation adds `tsconfig.workspace.json` and `test/tsconfig.json` to resolve workspace source before a build; those mappings and repository-only tests are not shipped in a generated project.
+The selected framework declares `@galaxie-ai/*` dependencies at `^0.2.0`; registry resolution awaits publication. npm tarball mode supplies local file specifications instead. The Vite config uses package exports, with no aliases into the galaxie checkout. The standalone `tsconfig.json` keeps the repository's strict compiler options, and the project declares its own TypeScript and Node/React types. Repository validation adds `tsconfig.workspace.json` and `test/tsconfig.json` to resolve workspace source before a build; those mappings and repository-only tests are not shipped in a generated project.
 
 Standalone npm installs, production builds and Chromium mock completion pass on Node 22.23.5 and 24.15.0, with Built-in AI and WebGPU disabled; see the [verification record](https://github.com/vinhnxv/galaxie/blob/main/docs/standalone-verification.md) for versions, controls and limits. The declared Node floor is 22.22.2; only those two patch versions were tested.
 

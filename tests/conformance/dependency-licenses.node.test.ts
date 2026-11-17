@@ -81,7 +81,15 @@ test('the real lockfile has a non-empty runtime set including optional launch pe
   const result = runCheck();
   const output = String(result.stdout);
   expect(output, String(result.stderr)).toMatch(/Checked [1-9]\d* locked runtime dependencies/);
-  for (const name of ['@langchain/core', '@mlc-ai/web-llm', '@huggingface/transformers', 'react']) {
+  for (const name of [
+    '@langchain/core',
+    '@mlc-ai/web-llm',
+    '@huggingface/transformers',
+    'react',
+    '@google/adk',
+    'pyodide',
+    'fflate',
+  ]) {
     expect(output).toContain(`${name}@`);
   }
 });

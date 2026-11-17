@@ -7,9 +7,13 @@ XSS and other same-origin code can bypass those paths. Read the
 [security review](../security-review.md) and [package guidance](../../llms.txt)
 alongside these integration steps. The seven launch packages (`@galaxie-ai/ui-protocol`,
 `@galaxie-ai/core`, `@galaxie-ai/adapter-kit`, `@galaxie-ai/adapter-langgraph`, `@galaxie-ai/models`,
-`@galaxie-ai/storage-indexeddb` and `@galaxie-ai/react`) are versioned 0.1.0 and published
-to npm.
-The other packages remain private workspace packages.
+`@galaxie-ai/storage-indexeddb` and `@galaxie-ai/react`) remain published on npm
+at 0.1.0. All thirteen packages in the [release guide](../releasing.md#publish-order),
+including the three additional adapters, both artifact starters and create, are
+prepared for 0.2.0; 0.2.0 is not yet published. `eslint-plugin` and `tools-mcp`
+remain private workspace packages. Generated projects use `^0.2.0` caret ranges;
+upgrade all galaxie pins together after publication. Registry installs of 0.2.0
+are unverified; current standalone proof uses npm tarballs and mock models.
 
 For host-authored wiring in a data file, see the [host configuration guide](host-configuration.md) and its worked host-remote example.
 For a Next.js App Router host, see the [Next.js guide](nextjs.md) and its client-only mock example.
@@ -33,7 +37,7 @@ deployment; the detailed topic sections below remain the integration reference.
 
 ## Layer 0: run an agent in the page
 
-Generate a browser-only LangGraph.js project with the [private create package](../../packages/create/README.md),
+Generate a browser-only LangGraph.js project with the [create package, prepared for 0.2.0 and not yet published](../../packages/create/README.md),
 keeping its Vite + React setup. In the project, use the two snippets below as
 `src/agent.ts` and `src/main.tsx`. The agent is verbatim from the
 [shared framework layer](../../templates/frameworks/langgraph-js/files/src/agent.ts);

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, onTestFinished, test } from 'vitest';
+import metadata from '../../core/package.json' with { type: 'json' };
 import { compose, LayerCollisionError, SelectionError } from '../src/compose.js';
 import { type Layer, LayerManifestError, loadLayers } from '../src/layers.js';
 
@@ -374,8 +375,8 @@ test.each(['browser-only', 'gateway'])(
     expect(manifest.scripts.dev).toBe(
       'vite build && vite preview --host 127.0.0.1 --port 4173 --strictPort',
     );
-    expect(manifest.dependencies['@galaxie-ai/adapter-go']).toBe('^0.1.0');
-    expect(manifest.dependencies['@galaxie-ai/starter-go']).toBe('^0.1.0');
+    expect(manifest.dependencies['@galaxie-ai/adapter-go']).toBe(`^${metadata.version}`);
+    expect(manifest.dependencies['@galaxie-ai/starter-go']).toBe(`^${metadata.version}`);
     expect(manifest.dependencies['@langchain/core']).toBe('1.2.20');
     expect(manifest.dependencies.zod).toBe('4.6.7');
     expect(() => compose(layers, { ...options, kind, framework: 'unknown' })).toThrow(

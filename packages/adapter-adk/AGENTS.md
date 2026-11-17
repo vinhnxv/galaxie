@@ -2,6 +2,8 @@
 
 ## Purpose
 
+Prepared for the 0.2.0 release; not yet published. APIs may change in a 0.x minor release. Publishing is a manual maintainer step in the [release guide](../../docs/releasing.md).
+
 Host Google ADK (JavaScript) agents as a galaxie executor, with routing, labels, consent,
 budgets and persistence kept in galaxie. Durable sessions go through the byte-record checkpoint port. A pause is accepted only where ADK's resume does not rerun earlier siblings (`restartsSiblings` in `src/adapter.ts`, evidence in `test/agents.test.ts`); the admission-capable last-child rerun remains REFUSED after a second-write scope mismatch and early long-running invocation, so loosening that rule still needs new evidence. See the
 [README](README.md) and [ADR-0020](../../docs/adr/0020-google-adk-through-an-adapter.md).

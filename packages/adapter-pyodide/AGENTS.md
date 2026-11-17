@@ -2,6 +2,8 @@
 
 ## Purpose
 
+Prepared for the 0.2.0 release; not yet published. APIs may change in a 0.x minor release. Publishing is a manual maintainer step in the [release guide](../../docs/releasing.md).
+
 Run a trusted LangGraph Python graph in a dedicated Pyodide Worker while model
 routing, credentials, output checks and capability policy remain in JavaScript.
 See the [README](README.md) and [Python ADR](../../docs/adr/0018-python-agents-through-pyodide.md).
@@ -11,7 +13,8 @@ See the [README](README.md) and [Python ADR](../../docs/adr/0018-python-agents-t
 - `createPyodideAdapter` and its host-facing types are exported from [src/index.ts](src/index.ts).
 - `@galaxie-ai/adapter-pyodide/worker` is the Worker entry. Only it imports Pyodide.
 - `@galaxie-ai/adapter-pyodide/runtime-files` exports `lockedWheels` and `runtimeFiles`
-  for hosts serving wheels and runtime assets; the package remains private and unpublished.
+  for hosts serving wheels and runtime assets; direct registry consumers must arrange
+  delivery of the repo-relative vendored cryptography wheel (see the README).
 - [src/bridge.ts](src/bridge.ts) validates the closed JSON protocol without code generation.
 - [src/runtime-files.ts](src/runtime-files.ts) binds the expected third-party wheel inventory.
 

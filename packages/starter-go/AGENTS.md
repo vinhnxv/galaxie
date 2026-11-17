@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Own the private starter artifacts and build-time helpers. The Go author source lives only in the framework template.
+Own the starter artifacts and build-time helpers. Prepared for the 0.2.0 release; not yet published. APIs may change in a 0.x minor release. The Go author source lives only in the framework template.
 
 ## Entry points
 
@@ -14,7 +14,7 @@ Preserve deterministic source hashing, exact toolchain selection and verified ar
 
 ## Never
 
-Import a galaxie runtime or adapter package, publish this package, duplicate the author Go source, or weaken ADR-0012 controls.
+Import a galaxie runtime or adapter package, duplicate the author Go source, or weaken ADR-0012 controls.
 
 ## Limits
 

@@ -551,7 +551,7 @@ test.each(['pnpm', 'npm', 'yarn', 'bun'])(
   },
 );
 
-test('the ADK CLI warns that the adapter is unpublished unless packed tarballs are supplied', async () => {
+test('the ADK CLI explains registry requirements unless packed tarballs are supplied', async () => {
   const { root } = await fixture();
   const streams = output();
   expect(
@@ -562,11 +562,13 @@ test('the ADK CLI warns that the adapter is unpublished unless packed tarballs a
       env: { npm_config_user_agent: 'npm/11' },
     }),
   ).toBe(0);
-  expect(streams.text()).toContain('@galaxie-ai/adapter-adk is not published yet');
+  expect(streams.text()).toContain(
+    'Registry installation requires @galaxie-ai/adapter-adk at the generated dependency ranges',
+  );
 });
 
 test.each(['browser-only', 'gateway'])(
-  'the %s ADK Go CLI warns about both unpublished packages and emits the Go source',
+  'the %s ADK Go CLI explains registry requirements for both packages and emits the Go source',
   async (kind) => {
     const { root } = await fixture();
     const streams = output();
@@ -579,7 +581,7 @@ test.each(['browser-only', 'gateway'])(
       }),
     ).toBe(0);
     expect(streams.text()).toContain(
-      '@galaxie-ai/adapter-go and @galaxie-ai/starter-go are not published yet',
+      'Registry installation requires @galaxie-ai/adapter-go and @galaxie-ai/starter-go at the generated dependency ranges',
     );
     expect(await readdir(join(root, 'go-app/go'))).toEqual([
       'agent.go',
@@ -591,7 +593,7 @@ test.each(['browser-only', 'gateway'])(
 );
 
 test.each(['browser-only', 'gateway'])(
-  'the %s LangGraph Python CLI warns about both unpublished packages and emits the Python source',
+  'the %s LangGraph Python CLI explains registry requirements for both packages and emits the Python source',
   async (kind) => {
     const { root } = await fixture();
     const streams = output();
@@ -604,7 +606,7 @@ test.each(['browser-only', 'gateway'])(
       }),
     ).toBe(0);
     expect(streams.text()).toContain(
-      '@galaxie-ai/adapter-pyodide and @galaxie-ai/starter-python are not published yet',
+      'Registry installation requires @galaxie-ai/adapter-pyodide and @galaxie-ai/starter-python at the generated dependency ranges',
     );
     expect(await readdir(join(root, 'python-app/python/agent/starter_agent'))).toEqual([
       '__init__.py',

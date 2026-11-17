@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Own the private LangGraph-lane wheel distribution and build-time verification.
+Own the LangGraph-lane wheel distribution and build-time verification. Prepared for the 0.2.0 release; not yet published. APIs may change in a 0.x minor release. The whole release waits for the maintainer license review in the [release guide](../../docs/releasing.md#prepared-adapters).
 
 ## Entry points
 
@@ -21,7 +21,7 @@ the framework overlay live in `templates/frameworks/langgraph-python`.
 
 ## Never
 
-Import a galaxie runtime or adapter package here, publish this package, repair or
+Import a galaxie runtime or adapter package here, repair or
 download cache entries during prepack, or weaken ADR-0012 controls.
 
 ## Limits

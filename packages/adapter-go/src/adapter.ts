@@ -118,7 +118,7 @@ function failureCode(error: unknown, fallback: ErrorCode = 'unavailable'): Error
 export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAgent, GoServices> {
   return {
     id: GO_EXECUTOR_ID,
-    version: '0.0.0',
+    version: '0.2.0',
     features: {
       interrupts: true,
       resume: true,

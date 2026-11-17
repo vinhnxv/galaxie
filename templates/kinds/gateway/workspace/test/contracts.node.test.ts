@@ -17,6 +17,9 @@ const framework = JSON.parse(
     'utf8',
   ),
 ) as { package: { dependencies: Record<string, string> } };
+const coreVersion = JSON.parse(
+  await readFile(resolve(root, '../../../../../packages/core/package.json'), 'utf8'),
+) as { version: string };
 const frameworkDependencies = framework.package.dependencies;
 const launch = [
   '@galaxie-ai/core',
@@ -47,7 +50,7 @@ it('declares exactly four launch packages, registry ranges and the existing thir
       .filter((name) => name.startsWith('@galaxie-ai/'))
       .sort(),
   ).toEqual([...launch].sort());
-  for (const name of launch) expect(dependencies[name]).toBe('^0.1.0');
+  for (const name of launch) expect(dependencies[name]).toBe(`^${coreVersion.version}`);
   const thirdParties = {
     ...Object.fromEntries(
       Object.entries(frameworkDependencies).filter(([name]) => !name.startsWith('@galaxie-ai/')),

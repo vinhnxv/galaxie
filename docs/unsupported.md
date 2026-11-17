@@ -10,6 +10,20 @@ ADK recipe entries; the other entries were last checked against the
 implementation on 2026-10-31. The [MVP exit record](mvp-exit-record.md) maps acceptance requirements to existing
 evidence, with the maintainer's Go decision (2026-10-30) recorded and its open items still open.
 
+## Release preparation and distribution
+
+Thirteen packages are prepared for the 0.2.0 lockstep release, not yet published.
+The seven launch packages remain on npm at 0.1.0; historical registry results do
+not verify 0.2.0. Repository `create-clean` CI and local standalone runs use npm
+tarballs and mocks. pnpm/yarn tarball mode, devices, real models and non-Linux CI
+remain unverified by this preparation. Direct registry consumers of
+`adapter-pyodide` must arrange hosting for the vendored cryptography wheel's
+repository-relative URL; generated LangGraph Python projects obtain their wheel
+set from `starter-python` instead. The whole release waits for the maintainer's
+recorded Python license review, including the unmodified registry Pyodide
+MPL-2.0 exception. See [releasing](releasing.md) and the
+[standalone verification record](standalone-verification.md).
+
 ## Execution and LangGraph
 
 - LangGraph.js routed `bindTools` and `host.langchain.capabilityTool` have mock-only scenarios on Node and Chromium, and no real-model result is claimed. The helper refuses to offer a write without `approval: 'confirm'` and host confirmation coverage. The ADK JavaScript helper and the Python `capability_tool` helpers (ADK, DSPy, pydantic-ai) apply the same rule: they refuse a capability that is not a read unless it is bound with `approval: 'confirm'` and the runtime has host confirmation coverage, and they refuse an unbound name, with the fixed `invalid` error. The ADK helpers return that error to the model as fixed text; the DSPy and pydantic-ai helpers end the run with it. The core broker's treatment of ordinary capability calls is unchanged, so a direct `capabilities.call` from agent code is not affected. The evidence is mock and in-process scenarios only. A declined confirmation returns fixed `denied` text and the model may request the write again, bounded by the tool-call budget. Output safety checks tool-call arguments and reply text, not tool-call names or IDs. A provider whose `bindTools` returns a wrapped runnable does not receive the routed destination marker. Custom author-built tools, including wrappers that replace a helper's declarations, are outside this guarantee: authors must preserve broker calls, labels, budgets, effect scopes and host confirmations. A native `ToolNode` must use `{ handleToolErrors: false }` so fatal broker failures end the run; the helper itself converts only `denied` and `invalid` into fixed model-visible messages. The full node config and deterministic per-task call order remain necessary for recovery ([tool helper](../packages/adapter-langgraph/README.md#model-chosen-capability-tools), [mock scenarios](../tests/conformance/langgraph-tools.test.ts)).

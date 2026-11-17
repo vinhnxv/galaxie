@@ -10,6 +10,8 @@
 ## 1. What exists today
 
 - **MVP evidence:** the [exit record](mvp-exit-record.md) maps AT-01 through AT-36 to existing evidence and gaps, and [unsupported features](unsupported.md) lists current limits and unverified paths; the maintainer decided Go on 2026-10-30, with the open items still open.
+- **Release preparation:** thirteen public packages share 0.2.0, not yet published; the seven launch packages remain on npm at 0.1.0. `eslint-plugin` and `tools-mcp` remain private. The [release guide](releasing.md) defines order, lockstep upgrades and the whole-release Python license review prerequisite.
+- **`packages/create`:** a dependency-free composer and CLI with packaged templates and coding-agent guidance. Both React starter kinds support LangGraph.js, ADK JavaScript, ADK Go and LangGraph Python. The pack test inspects thirteen tarballs; an isolated packed-create test compares scaffolding with checkout output. Repository `create-clean` CI and [standalone runs](standalone-verification.md) exercise npm tarballs with mocks. Registry installs of 0.2.0, devices, real models, pnpm/yarn tarball mode and non-Linux CI remain unverified. CLI `add`/`config` and non-React bindings remain deferred under the brief's triggers.
 - **Toolchain:** a pnpm workspace with TypeScript 7 and 6 side by side, Biome, Vitest and CI (§10).
 - **`packages/core`:** framework-neutral contracts and four M1 runtime slices: lifecycle, identity, cancellation, replayable in-memory events, a capability broker, model routing with consent and per-call credentials, sticky labels, argument shapes, finite budgets, interrupt dispatch and resume, and allowlisted OpenTelemetry spans. M3 adds an optional durable recovery port, inbox reconciliation and a write-effect journal (§6, §8.1–§8.3). The M1 exit controls add interaction URL policy and development trace text filtered by live labels and destination (§6, §9).
 - **`packages/adapter-langgraph`:** native LangGraph execution, host-injected models and checkpointers, run-bound capability access, native step limits and callback-based tracing.
@@ -253,8 +255,8 @@ Spike code is throwaway. Keep it out of `packages/` and never promote it to pack
 
 ### Starter composition
 
-The private, unpublished [`@galaxie-ai/create`](../packages/create/README.md) package
-loads repository layers from `templates/base`, `templates/kinds` and
+The [`@galaxie-ai/create`](../packages/create/README.md) package, prepared for the
+lockstep release and not yet published, loads layers from `templates/base`, `templates/kinds` and
 `templates/frameworks`. A layer has `layer.json`, verbatim `files/`, and optional
 repository-only `workspace/` files. `_gitignore` becomes `.gitignore`. Kind manifests
 declare supported frameworks; current kinds support only `langgraph-js` and keep
@@ -272,9 +274,9 @@ rolls back only its own creations after a failure.
 projects under the ignored `packages/create/.cache/composed`. Compiler and test
 commands invoke it explicitly; a cache-equality test rejects missing, changed or
 unexpected output. Generated projects omit workspace tests and mappings, and carry
-a `check` command that pins the emitted CSP and Trusted Types baseline. Layers stay
-in this checkout rather than the private package's `dist`; packaging and publishing
-them remain later work.
+a `check` command that pins the emitted CSP and Trusted Types baseline. The packed
+package carries copies of `templates/` and `skills/galaxie/` and falls back to the
+checkout layout when run from the repository.
 
 The CLI accepts a relative directory, kind and framework, with native terminal
 prompts for missing choices. It detects npm, pnpm or yarn and installs with

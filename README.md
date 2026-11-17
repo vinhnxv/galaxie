@@ -6,7 +6,7 @@ galaxie lets web apps run AI agents inside a web page, on the user's own device,
 
 Choose inference per model role under the app's policy: **local in the browser** with WebLLM, Transformers.js or Chrome Built-in AI; **partly local** by mixing local roles with roles using endpoints; or through a **backend or user endpoint** using an OpenAI-compatible provider.
 
-> **Status: experimental and pre-release.** The seven launch packages are on npm at 0.1.0 with no stability promise, and most testing uses mock and fake models. Read the [known limits](docs/unsupported.md), [project status](docs/status.md) and [Intended use and disclaimer](#intended-use-and-disclaimer) before you build on it.
+> **Status: pre-release.** The seven launch packages are on npm at 0.1.0. Thirteen packages are prepared for the 0.2.0 lockstep release; 0.2.0 is not yet published. APIs may change in a 0.x minor release, and most testing uses mock and fake models. Read the [known limits](docs/unsupported.md), [project status](docs/status.md) and [Intended use and disclaimer](#intended-use-and-disclaimer) before you build on it.
 
 ## Why
 
@@ -48,7 +48,7 @@ Each adapter lists what it does not support in the [unsupported-features list](d
 
 ## Project status
 
-See [the detailed project status](docs/status.md) for implemented behavior, verification and unmeasured paths. Testing is mostly with mocks; the packages are on npm at 0.1.0 and carry no stability promise. The [MVP exit record](docs/mvp-exit-record.md) records acceptance evidence and gaps, and the [unsupported-features list](docs/unsupported.md) records known limits and unverified paths.
+See [the detailed project status](docs/status.md) for implemented behavior, verification and unmeasured paths. Testing is mostly with mocks. The seven launch packages remain available on npm at 0.1.0; all thirteen public packages are prepared for 0.2.0, not yet published. The [release guide](docs/releasing.md) lists the coordinated publish order and the Python license review that gates publishing. The [MVP exit record](docs/mvp-exit-record.md) records acceptance evidence and gaps, and the [unsupported-features list](docs/unsupported.md) records known limits and unverified paths.
 
 ## Try it
 
@@ -70,20 +70,26 @@ This serves a local English-tutor host with a scripted mock model, so nothing is
 
 The [browser-only starter](templates/kinds/browser-only/files/README.md) has its own tiny agent, uses available Built-in AI or an immediate mock, and loads WebLLM only after a size-disclosed opt-in. The [gateway starter](templates/kinds/gateway/files/README.md) runs the same agent through a same-origin Node gateway with server-held prompts and scoped HTTP capabilities.
 
-Generate either starter from layers with the [private, unpublished create package](packages/create/README.md).
+Generate either starter from layers with the [create package](packages/create/README.md), prepared for 0.2.0 and not yet published. It supports LangGraph.js, ADK JavaScript, ADK Go and LangGraph Python in both kinds. Repository tarball-mode `create-clean` CI covers all eight combinations on Node 24 and LangGraph.js on Node 22. The pack test inspects thirteen packages, and the isolated packed-create test runs help and a scaffold outside the checkout. [Standalone runs](docs/standalone-verification.md) cover npm tarballs with mocks. Registry installs of 0.2.0, real models, devices, pnpm/yarn tarball mode and non-Linux CI remain unverified.
 
 ## Install in your own app
 
+These commands install the published 0.1.0 launch packages today:
+
 ```sh
-pnpm add @galaxie-ai/core @galaxie-ai/adapter-langgraph @galaxie-ai/models @galaxie-ai/storage-indexeddb @galaxie-ai/react
+pnpm add @galaxie-ai/core@0.1.0 @galaxie-ai/adapter-langgraph@0.1.0 @galaxie-ai/models@0.1.0 @galaxie-ai/storage-indexeddb@0.1.0 @galaxie-ai/react@0.1.0
 pnpm add zod @opentelemetry/api react @langchain/core@~1.2.20 @langchain/langgraph@~1.5.1 @langchain/langgraph-checkpoint@~1.2.0
 ```
+
+After the maintainer publishes 0.2.0, upgrade all `@galaxie-ai/*` pins together; 0.x minor releases may change APIs. Generated projects use `^0.2.0` caret ranges and currently require local npm tarballs.
 
 `@galaxie-ai/ui-protocol` and `@galaxie-ai/adapter-kit` arrive as dependencies. `@galaxie-ai/models` has no root export: import a provider subpath such as `@galaxie-ai/models/webllm`, and install only the provider libraries you use, which are optional peers (`@mlc-ai/web-llm`, `@huggingface/transformers` with `@huggingface/transformers-structured-output`, and `@langchain/openai`). Each package README lists its peers and exact ranges.
 
 Known limit: the packages were tested with `@langchain/core` 1.2.x. The current `@langchain/langgraph` pulls in `@langchain/langgraph-sdk`, which asks for `@langchain/core` `^1.3.2`, so your package manager can warn about that peer. Core 1.3.x is not tested with galaxie.
 
 ## Repository map
+
+The thirteen public packages below are prepared for 0.2.0, not yet published at that version. `tools-mcp` and `eslint-plugin` remain private workspace packages.
 
 | Package | Purpose |
 | --- | --- |
@@ -98,6 +104,9 @@ Known limit: the packages were tested with `@langchain/core` 1.2.x. The current 
 | [`@galaxie-ai/adapter-pyodide`](packages/adapter-pyodide/README.md) | Python frameworks through Pyodide |
 | [`@galaxie-ai/adapter-adk`](packages/adapter-adk/README.md) | Google ADK (JavaScript) adapter |
 | [`@galaxie-ai/adapter-go`](packages/adapter-go/README.md) | Google ADK (Go) through WebAssembly |
+| [`@galaxie-ai/starter-go`](packages/starter-go/README.md) | Prebuilt Go agent, module sources and build helpers |
+| [`@galaxie-ai/starter-python`](packages/starter-python/README.md) | LangGraph Python wheel distribution and build helpers |
+| [`@galaxie-ai/create`](packages/create/README.md) | Layered starter CLI with bundled templates and coding-agent guidance |
 | [`@galaxie-ai/eslint-plugin`](packages/eslint-plugin/README.md) | Lint rules that flag direct platform access in agent code |
 | [`templates/kinds/browser-only`](templates/kinds/browser-only/files/README.md) | Browser-only Vite + React starter layers with mock fallback and pending-question recovery |
 | [`templates/kinds/gateway`](templates/kinds/gateway/files/README.md) | Gateway starter layers with a Node model proxy, private prompts and scoped HTTP capabilities |

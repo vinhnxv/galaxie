@@ -1,7 +1,6 @@
 {
   "name": "@galaxie-ai/adapter-go",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.2.0",
   "description": "Google ADK (Go) executor for galaxie: Go compiled to WebAssembly in a Worker, with policy kept in JavaScript.",
   "license": "Apache-2.0",
   "repository": {

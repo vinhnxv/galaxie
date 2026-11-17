@@ -2,6 +2,8 @@
 
 ## Purpose
 
+Prepared for the 0.2.0 release; not yet published. APIs may change in a 0.x minor release. Publishing is a manual maintainer step in the [release guide](../../docs/releasing.md).
+
 Host Google ADK (Go) agents compiled to WebAssembly as a galaxie executor (`adk-go`). Go runs in a
 dedicated Worker; routing, labels, consent, budgets, credentials, output checks and authorization
 stay in JavaScript. See the [README](README.md), the [Go module](../../go/README.md) and

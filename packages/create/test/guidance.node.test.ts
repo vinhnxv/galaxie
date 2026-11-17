@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, onTestFinished, test } from 'vitest';
+import metadata from '../../core/package.json' with { type: 'json' };
 import { compose, LayerCollisionError } from '../src/compose.js';
 import { GuidanceError, loadGuidanceSource, renderGuidance } from '../src/guidance.js';
 import { loadLayers } from '../src/layers.js';
@@ -40,9 +41,13 @@ test.each(combinations)(
       `golden/${choice.kind}-${choice.framework}.golden.txt`,
     );
     expect(Buffer.byteLength(agents)).toBeLessThan(8192);
-    expect(agents.match(/<!-- galaxie:begin guidance=1 skill=0\.1\.0 -->/g)).toHaveLength(1);
+    expect(
+      agents.split(`<!-- galaxie:begin guidance=1 skill=${metadata.version} -->`),
+    ).toHaveLength(2);
     expect(agents.match(/<!-- galaxie:end -->/g)).toHaveLength(1);
-    expect(agents.startsWith('<!-- galaxie:begin guidance=1 skill=0.1.0 -->\n')).toBe(true);
+    expect(agents.startsWith(`<!-- galaxie:begin guidance=1 skill=${metadata.version} -->\n`)).toBe(
+      true,
+    );
     expect(agents.endsWith('<!-- galaxie:end -->\n')).toBe(true);
     expect(agents).toContain('Significant writes require host-rendered, single-use confirmations');
     expect(agents).toContain('npm run check');
@@ -111,7 +116,10 @@ test.each(['SKILL.md', 'references/kind-browser-only.md', 'references/framework-
 
 test('a skill version is required for the managed block', async () => {
   const input = new Map(await source);
-  input.set('SKILL.md', Buffer.from(text(input.get('SKILL.md')).replace('version: 0.1.0\n', '')));
+  input.set(
+    'SKILL.md',
+    Buffer.from(text(input.get('SKILL.md')).replace(`version: ${metadata.version}\n`, '')),
+  );
   expect(() => renderGuidance(input, selection)).toThrow('version');
 });
 

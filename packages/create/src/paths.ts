@@ -1,7 +1,14 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { existsSync } from 'node:fs';
 import { basename, isAbsolute, parse, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+export function assetRoot(path: 'templates' | 'skills/galaxie'): string {
+  const packed = fileURLToPath(new URL(`../${path}`, import.meta.url));
+  return existsSync(packed) ? packed : fileURLToPath(new URL(`../../../${path}`, import.meta.url));
+}
 
 export class ProjectPathError extends Error {}
 
