@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { createAdkAdapter } from '../../packages/adapter-adk/src/index.js';
 import { createGoAdapter } from '../../packages/adapter-go/src/index.js';
@@ -18,9 +18,21 @@ interface Manifest {
 }
 
 function readManifest(directory: string): Manifest {
-  return JSON.parse(
-    readFileSync(new URL(`../../${directory}/package.json`, import.meta.url), 'utf8'),
-  ) as Manifest;
+  try {
+    return JSON.parse(
+      readFileSync(new URL(`../../${directory}/package.json`, import.meta.url), 'utf8'),
+    ) as Manifest;
+  } catch (error) {
+    if (
+      directory.startsWith('packages/create/.cache/') &&
+      (error as NodeJS.ErrnoException).code === 'ENOENT'
+    )
+      throw new Error(
+        `Missing composed manifest: ${directory}/package.json. Run pnpm run compose:create before testing prepared adapters.`,
+        { cause: error },
+      );
+    throw error;
+  }
 }
 
 const coreVersion = readManifest('packages/core').version;
@@ -34,17 +46,27 @@ const prepared = [
   directory,
   manifest: readManifest(`packages/${directory}`),
 }));
-const templates = [
-  'browser-only-langgraph-js',
-  'gateway-langgraph-js',
-  'browser-only-adk-js',
-  'gateway-adk-js',
-  'browser-only-adk-go',
-  'gateway-adk-go',
-].map((directory) => ({
-  directory,
-  manifest: readManifest(`packages/create/.cache/composed/${directory}`),
-}));
+const templates = ['browser-only', 'gateway']
+  .flatMap((kind) =>
+    ['langgraph-js', 'adk-js', 'adk-go', 'langgraph-python'].map(
+      (framework) => `${kind}-${framework}`,
+    ),
+  )
+  .map((directory) => ({
+    directory,
+    manifest: readManifest(`packages/create/.cache/composed/${directory}`),
+  }));
+const publicPackages = readdirSync(new URL('../../packages/', import.meta.url), {
+  withFileTypes: true,
+})
+  .filter((entry) => entry.isDirectory())
+  .map(({ name }) => ({ directory: name, manifest: readManifest(`packages/${name}`) }))
+  .filter(({ manifest }) => manifest.private !== true);
+const templateNodeRange = (
+  JSON.parse(readFileSync(new URL('../../templates/base/layer.json', import.meta.url), 'utf8')) as {
+    package: Manifest;
+  }
+).package.engines?.node;
 const createWorker = (): never => {
   throw new Error('Adapter version checks must not create a Worker.');
 };
@@ -69,7 +91,7 @@ const versions: Readonly<Record<string, readonly string[]>> = {
 
 function mismatchedEngines(entries: typeof templates): string[] {
   return entries
-    .filter(({ manifest }) => manifest.engines?.node !== '>=22.22.2')
+    .filter(({ manifest }) => manifest.engines?.node !== templateNodeRange)
     .map(({ directory }) => directory);
 }
 
@@ -101,8 +123,11 @@ test.each(prepared)(
   },
 );
 
-test('prepared adapters and both starters declare the same Node floor', () => {
-  const entries = [...prepared, ...templates];
+test('every public package and composed project declares the base template Node range', () => {
+  expect(templateNodeRange).toBe('>=22.22.2');
+  expect(publicPackages).toHaveLength(13);
+  expect(templates).toHaveLength(8);
+  const entries = [...publicPackages, ...templates];
   expect(mismatchedEngines(entries)).toEqual([]);
   for (const entry of entries)
     expect(
@@ -153,4 +178,10 @@ test('all promoted packages join the dependency-license list', () => {
   expect(directories).toHaveLength(13);
   for (const { directory } of prepared) expect(directories).toContain(directory);
   expect(directories).toContain('create');
+});
+
+test('missing composed manifests explain how to prepare the cache', () => {
+  expect(() => readManifest('packages/create/.cache/composed/missing-fixture')).toThrow(
+    'Run pnpm run compose:create',
+  );
 });

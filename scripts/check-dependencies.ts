@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { isBuiltin } from 'node:module';
 import { dirname, join, relative, resolve } from 'node:path';
 import ts from '@typescript/typescript6';
+import type { LayerManifest } from '../packages/create/src/layers.js';
 
 interface ImportReference {
   readonly specifier: string;
@@ -109,6 +111,59 @@ function imports(file: string, strict = true): ImportReference[] {
   };
   visit(source);
   return references;
+}
+
+// Check each supported composition so an unrelated layer cannot hide a missing dependency.
+const templateLayers = files('templates', /^layer\.json$/).map((path) => ({
+  directory: dirname(path),
+  manifest: JSON.parse(readFileSync(path, 'utf8')) as LayerManifest,
+}));
+const templateBase = templateLayers.find(({ manifest }) => manifest.type === 'base');
+for (const kind of templateLayers.filter(({ manifest }) => manifest.type === 'kind')) {
+  for (const frameworkId of kind.manifest.frameworks ?? []) {
+    const framework = templateLayers.find(
+      ({ manifest }) => manifest.type === 'framework' && manifest.id === frameworkId,
+    );
+    if (templateBase === undefined || framework === undefined) {
+      problems.push(`${kind.directory}: missing base or framework layer ${frameworkId}`);
+      continue;
+    }
+    const selected = [templateBase, kind, framework];
+    const declared = new Set(
+      selected.flatMap(({ manifest }) =>
+        ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'].flatMap(
+          (section) => Object.keys(manifest.package[section] ?? {}),
+        ),
+      ),
+    );
+    for (const layer of selected) {
+      for (const area of ['files', 'workspace']) {
+        const directory = join(layer.directory, area);
+        if (!existsSync(directory)) continue;
+        for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
+          // Computed URLs are checked by the generated typecheck; inspect every literal reference.
+          for (const { specifier } of imports(file, false)) {
+            if (specifier.startsWith('.') || specifier.startsWith('/') || isBuiltin(specifier))
+              continue;
+            // Vite plugins own virtual modules; workspace-only tests use the repository's runner.
+            if (
+              specifier.startsWith('virtual:') ||
+              (area === 'workspace' && specifier === 'vitest')
+            )
+              continue;
+            const name = specifier
+              .split('/')
+              .slice(0, specifier.startsWith('@') ? 2 : 1)
+              .join('/');
+            if (!declared.has(name))
+              problems.push(
+                `${file}: template import ${specifier} is not declared by the selected layer manifests (${kind.manifest.id}/${frameworkId})`,
+              );
+          }
+        }
+      }
+    }
+  }
 }
 
 const browserModules = new Set(
