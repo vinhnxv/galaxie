@@ -26,9 +26,18 @@ afterEach(async () => {
 });
 
 async function fixture(
-  options: { wrongResponse?: boolean; failure?: boolean; lookupGate?: Promise<void> } = {},
+  options: {
+    wrongResponse?: boolean;
+    failure?: boolean;
+    postFailure?: boolean;
+    lookupGate?: Promise<void>;
+  } = {},
 ): Promise<{
-  report(body: unknown, cookie?: string): Promise<{ status: number; body: unknown }>;
+  report(
+    body: unknown,
+    cookie?: string,
+    headers?: Record<string, string>,
+  ): Promise<{ status: number; body: unknown }>;
   aliceCookie: string;
   bobCookie: string;
   calls: { lookup: number; posts: string[] };
@@ -38,6 +47,7 @@ async function fixture(
     authorization: 'synthetic-upstream-key',
     fetch: async (_url, init) => {
       calls.posts.push(String(init?.body));
+      if (options.postFailure) throw new Error('synthetic-upstream-key privateUpstreamBody');
       return Response.json({ privateUpstreamBody: 'synthetic-upstream-key' }, { status: 202 });
     },
   });
@@ -85,10 +95,11 @@ async function fixture(
     calls,
     aliceCookie: endpoint.issueSession('alice'),
     bobCookie: endpoint.issueSession('bob'),
-    async report(body, cookie) {
+    async report(body, cookie, headers = {}) {
       const response = await fetch(`http://127.0.0.1:${address.port}/feedback/scores`, {
         method: 'POST',
         headers: {
+          ...headers,
           'Content-Type': 'application/json',
           ...(cookie ? { Cookie: cookie.split(';')[0] ?? '' } : {}),
         },
@@ -107,6 +118,26 @@ test('only issued HttpOnly strict sessions reach the lookup', async () => {
   expect((await f.report(alice, 'llmops-session=unknown')).status).toBe(401);
   expect(f.calls).toEqual({ lookup: 0, posts: [] });
 });
+
+test.each(['x-user-id', 'x-user'])(
+  'client-supplied %s never selects the score owner',
+  async (name) => {
+    const f = await fixture();
+    expect(await f.report(alice, undefined, { [name]: 'alice' })).toEqual({
+      status: 401,
+      body: { reason: 'unauthenticated' },
+    });
+    expect(f.calls).toEqual({ lookup: 0, posts: [] });
+    expect((await f.report(alice, f.aliceCookie)).status).toBe(200);
+    const before = f.calls.posts.length;
+    expect(await f.report(alice, f.bobCookie, { [name]: 'alice' })).toEqual({
+      status: 403,
+      body: { reason: 'forbidden' },
+    });
+    expect(f.calls.posts).toHaveLength(before);
+    expect((await f.report(alice, f.aliceCookie, { [name]: 'bob' })).status).toBe(200);
+  },
+);
 
 test.each([
   { ...alice, runId: 'run|delimiter' },
@@ -132,7 +163,10 @@ test.each([
 test('first report binds, repeats preserve score bytes, and other users cannot reuse the association', async () => {
   const f = await fixture();
   expect(await f.report(alice, f.aliceCookie)).toEqual({ status: 200, body: { reason: 'posted' } });
-  expect((await f.report({ ...alice, value: 0 }, f.aliceCookie)).status).toBe(200);
+  expect(await f.report({ ...alice, value: 0 }, f.aliceCookie)).toEqual({
+    status: 200,
+    body: { reason: 'unchanged' },
+  });
   expect(new Set(f.calls.posts).size).toBe(1);
   const before = f.calls.posts.length;
   expect(await f.report(alice, f.bobCookie)).toEqual({
@@ -178,6 +212,22 @@ test('upstream errors remain coarse and do not leak upstream error text', async 
     body: { reason: 'upstream-error' },
   });
   expect(f.calls.posts).toEqual([]);
+});
+
+test('an upstream post failure retains the confirmed owner for retries', async () => {
+  const f = await fixture({ postFailure: true });
+  expect(await f.report(alice, f.aliceCookie)).toEqual({
+    status: 502,
+    body: { reason: 'upstream-error' },
+  });
+  expect(f.calls.posts).toHaveLength(1);
+  expect(await f.report(alice, f.bobCookie)).toEqual({
+    status: 403,
+    body: { reason: 'forbidden' },
+  });
+  expect(f.calls.posts).toHaveLength(1);
+  expect((await f.report(alice, f.aliceCookie)).status).toBe(502);
+  expect(f.calls.posts).toHaveLength(2);
 });
 
 test('overlapping first reports bind one owner after both lookups finish', async () => {

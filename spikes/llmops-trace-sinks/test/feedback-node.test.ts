@@ -1,6 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+// This live measurement file intentionally shares state and runs in declaration order:
+// session filtering populates sessionRuns for evaluation; beforeAll creates the common run,
+// host and score client; afterAll writes accumulated evidence. Run the whole file, not test filters.
+
 import assert from 'node:assert/strict';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { evaluateSessions } from '../src/evaluate.js';
@@ -243,11 +247,11 @@ test.skipIf(!enabled)(
       expect(
         await client.scoreRun(host.runTrace, entry.runId, entry.segment, name, 1),
       ).toMatchObject({ status: 'posted' });
-      // The client retains the first payload; later calls resend it unchanged whatever the
-      // clock or the new value say. The test pins that behaviour, not Langfuse's date handling.
+      // A repost with another value resends the stored bytes and reports `unchanged`; the test
+      // pins that behaviour, not Langfuse's date handling.
       expect(
         await client.scoreRun(host.runTrace, entry.runId, entry.segment, name, 0),
-      ).toMatchObject({ status: 'posted' });
+      ).toMatchObject({ status: 'unchanged' });
       const repeated = await waitForScores({ traceId: entry.traceId, name }, 1, inspectFeedback);
       expect(repeated).toHaveLength(1);
       expect(repeated[0]?.timestamp).toBe(initial[0]?.timestamp);

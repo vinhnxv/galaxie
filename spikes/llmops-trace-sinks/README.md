@@ -439,6 +439,12 @@ default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; bas
 [browser-linear.json](results/browser-linear.json) and
 [browser-interrupt-resume.json](results/browser-interrupt-resume.json) exactly
 match their Node counterparts, with **no lane-specific attribute exceptions**.
+This equality covers the shared projection: span attributes keep `galaxie.*`,
+`gen_ai.*`, `session.id`, `error.type`, `langfuse.observation.*`, and MLflow's
+`spanType`, `spanInputs`, `spanOutputs`, `chat.tokenUsage` and `llm.*` keys.
+Resource attributes and other span attributes are dropped before lane comparison;
+resource parity is not measured. Comparing resources would require extending the
+backend projection and regenerating live evidence, so this cycle documents the limit.
 The shared readback checks compare every backend span with the page's in-memory
 oracle, pin counts independently, inspect complete API responses before
 projection, and require positive credential calls and opted-in text. The JSON
@@ -459,7 +465,11 @@ and the routed canary. A short numeric experiment identifier is checked in URL
 segments, query values and header values, excluding Chromium's standardized
 `upgrade-insecure-requests` protocol bit. That bit still receives all credential
 and canary checks. Bodies and bundle numbers are not interpreted as experiment
-identifiers. Synthetic positive controls exercise both scanners. No generated
+identifiers. Header values also match embedded experiment identifiers of at least
+eight characters; shorter identifiers require equality to avoid unrelated numeric
+metadata matches. URL-encoded forms use `encodeURIComponent`, so uppercase hex only;
+lowercase or double encoding is not detected. URL path and query values still need
+equality. Synthetic positive controls exercise both scanners. No generated
 credential appeared in the bundle or either request capture. No page request or
 complete backend response contained the routed canary. Generated credentials in
 complete backend responses were not scanned; the separate static guard checks
@@ -473,6 +483,10 @@ error, which the dedicated control deliberately counts. Proxied runs have no
 `connect-src` violation. No eval or other CSP violation was observed. URLs in the
 recorded control are replaced with destination labels; ports and local paths are
 not persisted.
+This shows CSP as the first blocker, not the only one: the collector has no CORS
+configuration. No counterfactual without CSP was run. The recorded four violations
+are one observation; CSP violation counts may vary with exporter and browser timing.
+Playwright and receiver POST counts may also vary with navigation keepalive timing.
 
 [browser-close.json](results/browser-close.json) records observations, without a
 delivery assertion. Each case has a 60-second batch delay and a 15-second backend
@@ -484,8 +498,13 @@ observation window:
 | Navigate away, no explicit flush | SDK default | 3 / 3 of 3 |
 | Explicit force-flush and shutdown, then close | SDK default | 3 / 3 of 3 |
 
+The harness now also includes immediate `page.close()` with SDK default auto flush,
+separating the batch option from the close mechanism. That fourth case has not been
+measured: the committed result above predates this offline hardening cycle.
+
 The lifecycle field lists only callbacks successfully relayed to Playwright;
 callbacks during document destruction are not a complete browser event log.
+Relayed lifecycle callback counts and delivered span counts may vary between runs.
 The counts demonstrate sampled delivery, not a delivery guarantee. No `pagehide`
 or `sendBeacon` mitigation was added.
 
@@ -593,6 +612,11 @@ pnpm run stack:down
 Always run `stack:down`, including after a failed measurement; it removes volumes.
 The default offline tests need neither the stack, Chromium nor the Python
 environment. `LLMOPS_STACK=1` enables only the explicitly invoked live files.
+Run `test/feedback-node.test.ts` as a whole in declaration order: session-filter
+measurements populate the runs consumed by evaluation, and the score measurements
+share the run, host, client and evidence established by `beforeAll`. `afterAll`
+writes their accumulated evidence. Individual test-name filters are not independent
+measurement commands.
 
 | Workflow | Measured outcome |
 | --- | --- |
@@ -603,6 +627,15 @@ environment. `LLMOPS_STACK=1` enables only the explicitly invoked live files.
 | MLflow sessions | Root-only copy suffices for `mlflow.trace.session`; two sessions each return exactly their three traces in every phase. |
 | MLflow evaluation | Six traces per text mode, six rows and six values per scorer. Usage is five per trace; chat text presence follows opt-in. Root request/response are absent in both modes. |
 | Browser feedback | Own reports return 200; wrong trace or segment 404; a confirmed association already owned by another user 403; missing cookie 401. Bundle, full requests, receiver wire requests and response bodies pass the credential scans and their positive controls. |
+
+The hardening harness also scans every page response's complete headers, including
+all Set-Cookie entries, and score-response bodies. Bare Basic payload controls cover
+base64, base64url and URL-encoded forms offline; the live harness adds bare payload
+controls for the bundle, request body, response body and Set-Cookie scanner.
+These new live capture checks have not been run in this offline cycle. The recorded
+`reports.repeat.reason` in `results/browser-feedback.json` (`posted`) predates the
+`unchanged` outcome; the code and the live assertion now expect `unchanged`, and the
+recorded result has not been regenerated.
 
 [feedback-scores.json](results/feedback-scores.json),
 [sessions.json](results/sessions.json),
@@ -625,6 +658,13 @@ The host score client sends an array to `/api/public/scores`, with an ID formed
 from trace ID and score name and an explicit timestamp. It stores the entire
 first payload and resends its bytes, including the original value, name and
 timestamp. Only transport errors and 5xx get bounded retries; 207 and 4xx do not.
+The three-attempt retry budget waits 100 ms and then 200 ms between attempts;
+tests inject the delay. Any `TypeError` thrown by the `fetch` call itself and abort/timeout `DOMException`
+failures are retried; other wrapper errors and response-cleanup errors escape. A final
+5xx returns `rejected` with its HTTP status, while exhausted fetch failures return
+`transport-error`. A different value for a stored ID still resends the original
+bytes but returns `unchanged` after acceptance, including HTTP 200 with reason
+`unchanged` at the host endpoint. It does not claim the new value was stored.
 The running Langfuse reference's description specifies 202/207, while its
 generated response schema lists 200; live accepted posts return 202. Readback
 uses `/api/public/v3/scores?fields=subject` with a five-minute polling window.
@@ -664,11 +704,25 @@ HttpOnly, SameSite=Strict cookie selects the user. The endpoint confirms the
 reported trace's own run metadata and segment, then binds run/segment/trace to
 that user. A flush only hands spans to the collector: pages must retry
 `404 not-confirmed` after backend ingestion, and the live harness waits for roots
-before reporting. No user comes from the body.
+before reporting. No user comes from the body or client-supplied identity headers;
+offline endpoint tests exercise forged `x-user-id` and `x-user` headers. The live
+Chromium harness now asserts that an installed session cookie is absent from
+`document.cookie`; that assertion has not been run in this offline cycle. The
+offline cookie test checks the issued HttpOnly and SameSite=Strict attributes.
 
-First-report-wins is only as strong as the secrecy of run and trace IDs: someone
-who learns them first can bind them. Host-side hardening would bind at run start
-through a host-issued grant. Browser telemetry is client-controlled; backend
+The confirmed binding is committed before the upstream score post. An upstream
+failure leaves it in place so the same user can retry while another user remains
+unable to claim it. The 403 versus 404 split lets an authenticated user confirm an
+already bound association; this disclosure is an accepted limit of the local
+fixture, rather than a uniform nonexistence response.
+
+First-report-wins is only as strong as the secrecy of run and trace IDs: an
+authenticated user who learns them first can squat on the binding before the
+intended owner reports. Hosts should bind ownership at run start through a
+host-issued grant (the `galaxie-d53.6` follow-up); this spike does not build the grant
+because it needs the host's real identity and run-start integration.
+
+Browser telemetry is client-controlled; backend
 confirmation establishes consistency, not authenticity. Cookies and bindings are
 an in-memory fixture, not a real authentication design.
 

@@ -252,6 +252,7 @@ test.skipIf(process.env['LLMOPS_STACK'] !== '1')(
       const closeCases = [];
       for (const mechanism of [
         'close-no-auto-flush',
+        'close-default-auto-flush',
         'navigate-default-auto-flush',
         'explicit-flush-close',
       ] as const) {
@@ -294,6 +295,7 @@ test.skipIf(process.env['LLMOPS_STACK'] !== '1')(
           explicitFlush: mechanism === 'explicit-flush-close',
           oracleSpans: result.spans.length,
           windowMillis: 15_000,
+          // Relayed lifecycle callbacks and delivered span counts may vary with teardown timing.
           lifecycle,
           delivered: await observe(result, 15_000),
         });
@@ -367,6 +369,7 @@ test.skipIf(process.env['LLMOPS_STACK'] !== '1')(
       writeResult('browser-close.json', {
         demonstration: true,
         observationOnly: true,
+        timingNote: 'Lifecycle callback and delivered span counts may vary between runs.',
         cases: closeCases,
       });
       writeResult('browser-evidence.json', {
@@ -384,6 +387,7 @@ test.skipIf(process.env['LLMOPS_STACK'] !== '1')(
         credentialPositiveControls: credentials,
         laneSpecificAttributes,
         scans: {
+          timingNote: 'Playwright and receiver POST counts may vary with keepalive timing.',
           bundleFiles: files,
           bundleHits: [],
           requestHits: [],
@@ -394,6 +398,7 @@ test.skipIf(process.env['LLMOPS_STACK'] !== '1')(
           proxyWireHits: [],
         },
         cspControl: {
+          timingNote: 'CSP violation counts may vary with exporter and browser timing.',
           oracleSpans: direct.spans.length,
           exportErrors: direct.exportErrors,
           violations: directViolations.map((item) => ({

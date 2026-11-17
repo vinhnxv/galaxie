@@ -120,6 +120,26 @@ test.each([
   expect(scanRequests([request(overrides)], env, canary)).toContain('request[0]:experiment-id');
 });
 
+test('long experiment identifiers embedded in header values are detected', () => {
+  expect(
+    scanRequests(
+      [request({ headers: { 'x-fixture': 'route=experiment-12345; sampled=true' } })],
+      { ...env, MLFLOW_EXPERIMENT_ID: 'experiment-12345' },
+      canary,
+    ),
+  ).toContain('request[0]:experiment-id');
+});
+
+test('short experiment identifiers do not match substrings of unrelated metadata', () => {
+  expect(
+    scanRequests(
+      [request({ headers: { 'x-fixture': 'value=1234567; count=70' } })],
+      { ...env, MLFLOW_EXPERIMENT_ID: '1234567' },
+      canary,
+    ),
+  ).toEqual([]);
+});
+
 test('request capture keeps full headers and bytes for scanning, and summaries omit values and query strings', async () => {
   const captured = await captureRequest({
     url: () => `http://127.0.0.1:4318/otel/v1/traces?hidden=${secret}`,
@@ -174,16 +194,21 @@ test.each([
         .replace(/=+$/, ''),
   ],
   ['lower-case scheme', (value: string) => value.replace(/^Basic/, 'basic')],
+  ['URL-encoded bare Basic payload', (value: string) => encodeURIComponent(value.slice(6))],
+  [
+    'URL-encoded bare payload in base64url form',
+    (value: string) => encodeURIComponent(value.slice(6).replace(/\+/g, '-').replace(/\//g, '_')),
+  ],
 ])('scanner detects a %s', (_name, make) => {
   const keyEnv = {
     ...env,
-    LANGFUSE_AUTH_HEADER: `Basic ${Buffer.from('pk-lf-synthetic?>:sk-lf-synthetic??').toString('base64')}`,
+    LANGFUSE_AUTH_HEADER: `Basic ${Buffer.from('pk-lf-synthetic~~~:sk-lf-synthetic???x').toString('base64')}`,
   };
   const value = make(keyEnv.LANGFUSE_AUTH_HEADER);
-  expect(scanBundle([value], keyEnv).length).toBeGreaterThan(0);
-  expect(
-    scanRequests([request({ body: Buffer.from(value) })], keyEnv, canary).length,
-  ).toBeGreaterThan(0);
+  expect(scanBundle([value], keyEnv)).toContain('bundle[0]:secret:LANGFUSE_AUTH_HEADER');
+  expect(scanRequests([request({ body: Buffer.from(value) })], keyEnv, canary)).toContain(
+    'request[0]:secret:LANGFUSE_AUTH_HEADER',
+  );
 });
 
 test('a malformed percent escape in a path is reported, not thrown', () => {
@@ -193,10 +218,39 @@ test('a malformed percent escape in a path is reported, not thrown', () => {
 });
 
 test('score response scan sees Basic values, generated secrets and canaries without exposing them', () => {
-  expect(scanResponses(['{"reason":"posted"}'], env, canary)).toEqual([]);
+  expect(scanResponses([{ body: '{"reason":"posted"}', headers: [] }], env, canary)).toEqual([]);
   for (const value of [auth, secret, canary]) {
-    const hits = scanResponses([JSON.stringify({ unexpected: value })], env, canary);
+    const hits = scanResponses(
+      [{ body: JSON.stringify({ unexpected: value }), headers: [] }],
+      env,
+      canary,
+    );
     expect(hits.length).toBeGreaterThan(0);
     expect(JSON.stringify(hits)).not.toContain(value);
   }
 });
+
+test.each(['x-fixture', 'set-cookie'])(
+  'response scan detects bare Basic payloads and canaries in %s without exposing values',
+  (name) => {
+    const payload = auth.slice(6);
+    for (const value of [payload, encodeURIComponent(payload), canary]) {
+      const hits = scanResponses(
+        [{ body: '{"reason":"posted"}', headers: [{ name, value: `fixture=${value}; HttpOnly` }] }],
+        env,
+        canary,
+      );
+      expect(hits).toContain(
+        `response[0]:${value === canary ? 'credential-canary' : 'secret:LANGFUSE_AUTH_HEADER'}`,
+      );
+      expect(JSON.stringify(hits)).not.toContain(value);
+    }
+    expect(
+      scanResponses(
+        [{ body: '', headers: [{ name, value: 'fixture=unrelated; HttpOnly' }] }],
+        env,
+        canary,
+      ),
+    ).toEqual([]);
+  },
+);

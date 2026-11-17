@@ -138,6 +138,8 @@ export function createScoreEndpoint(options: {
           reply(403, 'forbidden');
           return;
         }
+        // Commit the confirmed binding before the upstream post. A failed post leaves ownership
+        // intact, so the same user can retry without another user taking the association.
         const segments = runs.get(body.runId) ?? new Map<number, string>();
         segments.set(body.segment, body.traceId);
         runs.set(body.runId, segments);
@@ -148,10 +150,8 @@ export function createScoreEndpoint(options: {
           body.name,
           body.value,
         );
-        reply(
-          result.status === 'posted' ? 200 : 502,
-          result.status === 'posted' ? 'posted' : 'upstream-error',
-        );
+        const accepted = result.status === 'posted' || result.status === 'unchanged';
+        reply(accepted ? 200 : 502, accepted ? result.status : 'upstream-error');
       } catch {
         reply(502, 'upstream-error');
       }
