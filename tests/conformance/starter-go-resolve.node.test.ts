@@ -369,6 +369,40 @@ test('a tampered bundled Go module is an integrity error, not a source mismatch'
   await writeFile(join(f.packageDirectory, 'dist/go-module/go.mod'), 'module tampered\n');
   await expect(resolveAgent(f)).rejects.toMatchObject({ message: invalidArtifact });
 });
+
+test.each(['before', 'during'])(
+  'the actual bundled replacement must match the package manifest %s compilation',
+  async (timing) => {
+    const f = await fixture();
+    await writeFile(
+      join(f.projectDirectory, 'go/go.mod'),
+      'module example.invalid/starter\nreplace galaxie.invalid/galaxie => ../node_modules/@galaxie-ai/starter-go/dist/go-module\n',
+    );
+    const manifest = await release(f.packageDirectory, join(f.projectDirectory, 'go'));
+    const replacement = join(
+      f.projectDirectory,
+      'node_modules/@galaxie-ai/starter-go/dist/go-module',
+    );
+    await mkdir(dirname(replacement), { recursive: true });
+    await cp(join(f.packageDirectory, 'dist/go-module'), replacement, { recursive: true });
+    expect((await resolveAgent(f)).origin).toBe('prebuilt');
+    if (timing === 'before') {
+      await seedCache(
+        { ...f, manifest },
+        await readFile(join(f.packageDirectory, 'dist/agent.wasm')),
+      );
+      await writeFile(join(replacement, 'go.mod'), 'module unchecked\n');
+    } else {
+      await edited(f);
+      await fakeGo(
+        f,
+        'go1.27.3',
+        `fs.writeFileSync(args[args.indexOf('-o')+1],'compiled wasm');fs.appendFileSync(${JSON.stringify(join(replacement, 'go.mod'))},'// concurrent replacement edit\\n');`,
+      );
+    }
+    await expect(resolveAgent(f)).rejects.toThrow(invalidArtifact);
+  },
+);
 test('a corrupt edited cache is rebuilt locally and failed or killed compilers leave no cache entry', async () => {
   const f = await fixture();
   await edited(f);

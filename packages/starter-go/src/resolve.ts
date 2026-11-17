@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { buildAgent, buildSettings, runGo } from './build-env.js';
 import { invalidArtifact, missingGo } from './errors.js';
 import { type ArtifactMetadata, readManifest } from './manifest.js';
-import { hashTree, sourceHash } from './source-hash.js';
+import { checkReplacements, hashTree, sourceHash } from './source-hash.js';
 import { fileMetadata, verifyArtifact } from './verify.js';
 
 export interface ResolveOptions {
@@ -34,7 +34,6 @@ async function cachedArtifact(
       return metadata.sha256 === expected.sha256 && metadata.bytes === expected.bytes
         ? metadata
         : undefined;
-    // Edited builds have no release digest; their sidecar checks consistency only.
     const sidecar = await readFile(join(directory, 'agent.wasm.sha256'), 'utf8');
     return metadata.sha256 === sidecar.trim() ? metadata : undefined;
   } catch {
@@ -53,10 +52,22 @@ export async function resolveAgent(options: ResolveOptions): Promise<ResolvedAge
   const pkg = JSON.parse(await readFile(join(packageDirectory, 'package.json'), 'utf8')) as {
     version: string;
   };
-  const moduleSha256 = await hashTree(join(dist, 'go-module'));
-  if (pkg.version !== manifest.version || moduleSha256 !== manifest.goModule.sha256)
-    throw new Error(invalidArtifact);
   const directory = join(project, 'go');
+  async function checkedModuleHash(): Promise<string> {
+    const digest = await hashTree(join(dist, 'go-module'));
+    if (digest !== manifest.goModule.sha256) throw new Error(invalidArtifact);
+    if (await checkReplacements(directory)) {
+      const replacement = await hashTree(
+        join(project, 'node_modules/@galaxie-ai/starter-go/dist/go-module'),
+      ).catch(() => {
+        throw new Error(invalidArtifact);
+      });
+      if (replacement !== digest) throw new Error(invalidArtifact);
+    }
+    return digest;
+  }
+  if (pkg.version !== manifest.version) throw new Error(invalidArtifact);
+  const moduleSha256 = await checkedModuleHash();
   const sourceSha256 = await sourceHash(directory, pkg.version, moduleSha256);
   const cacheRoot = join(project, 'node_modules/.cache/galaxie-go');
   const cache = join(cacheRoot, sourceSha256);
@@ -92,11 +103,7 @@ export async function resolveAgent(options: ResolveOptions): Promise<ResolvedAge
   try {
     const output = join(temporary, 'agent.wasm');
     await buildAgent(directory, output, environment);
-    const compiledSource = await sourceHash(
-      directory,
-      pkg.version,
-      await hashTree(join(dist, 'go-module')),
-    );
+    const compiledSource = await sourceHash(directory, pkg.version, await checkedModuleHash());
     if (compiledSource !== sourceSha256)
       throw new Error('The Go starter source changed during compilation; run the build again.');
     const wasm = await fileMetadata(output);
