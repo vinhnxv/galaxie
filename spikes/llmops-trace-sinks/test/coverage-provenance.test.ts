@@ -7,9 +7,12 @@ import { expect, test } from 'vitest';
 
 // Copied/adapted fixtures were reviewed against these upstream bytes. Refresh a digest only
 // after reviewing whether the coverage family must change to retain its original semantics.
+// The digests pin upstream bytes: they detect upstream drift, not edits to the adapted copy.
 const provenance: Record<string, string> = {
   'tests/conformance/support/scripted-chat-model.ts':
     'ce1624ee35f3d34bb3e9178512e454c89b4f63314360a90a41819c16a8b4b06a',
+  'packages/adapter-adk/test/support/adk-env.ts':
+    'beb3132c79e93d5f4dff579c7a16d2b241abb783d26ac9eaa7d58d9c88882836',
   'tests/conformance/support/adk.ts':
     '7928d586f7e5e162e3f1c9c0a4a9dc4afda40ea7bab26a2030b7faf7dd53bcf3',
   'tests/conformance/cases-adk/fixtures.json':

@@ -115,6 +115,17 @@ matrixTest.each([null, '', undefined])('committed in-memory column rejects %s', 
   expect(() => auditMatrix(value)).toThrow('must say not measured: maintainer decision');
 });
 
+matrixTest.each([
+  ['rawResponsesScanned', 'raw scan control failed'],
+  ['spanIdsAndParentsMatch', 'span and parent control failed'],
+] as const)('committed live row rejects a false %s control', (control, message) => {
+  for (const id of ['langgraph-js', 'adk-js', 'adk-js-own-spans'] as const) {
+    const value = readMatrix();
+    Reflect.set((value.rows[id] as MeasuredRow).controls ?? {}, control, false);
+    expect(() => auditMatrix(value), id).toThrow(message);
+  }
+});
+
 matrixTest('committed live row rejects a missing backend column', () => {
   const value = readMatrix();
   const row = value.rows['langgraph-js'] as MeasuredRow;

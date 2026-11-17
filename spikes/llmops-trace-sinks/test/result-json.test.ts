@@ -15,3 +15,12 @@ test.each(['linear', 'tool-call', 'interrupt-resume', 'model-failure'])(
     expect(resultJson(JSON.parse(committed))).toBe(committed);
   },
 );
+
+test('keeps a non-last array expanded when its trailing comma would pass column 100', () => {
+  const long = Array.from({ length: 87 }, () => 'a').join('');
+  const value = { o: { k: [long], z: 1 } };
+  const last = { o: { z: 1, k: [long] } };
+  expect(resultJson(value)).toContain('"k": [\n');
+  expect(resultJson(last)).toContain(`"k": ["${long}"]`);
+  expect(resultJson({ a: [{}, 1] })).toContain('"a": [{}, 1]');
+});

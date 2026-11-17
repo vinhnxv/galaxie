@@ -357,7 +357,14 @@ export function auditMatrix(matrix: CoverageMatrix, options: { requireIds?: bool
     assert.equal(row.lane, live ? 'live' : 'in-memory', `${id}: incorrect measurement lane`);
     if (id === 'adk-js-own-spans') assert.equal(row.executorId, null, `${id}: unexpected executor`);
     else assert.equal(row.executorId, expectedExecutors[id], `${id}: unexpected root executor ID`);
-    if (!live) {
+    if (live) {
+      assert.equal(row.controls?.['rawResponsesScanned'], true, `${id}: raw scan control failed`);
+      assert.equal(
+        row.controls?.['spanIdsAndParentsMatch'],
+        true,
+        `${id}: span and parent control failed`,
+      );
+    } else {
       assert.equal(row.controls?.['outputCorrect'], true, `${id}: output control failed`);
       assert.equal(
         row.controls?.['modelCalls'],

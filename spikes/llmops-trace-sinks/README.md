@@ -223,8 +223,10 @@ removes temporary files.
 Offline fixture provenance tests pin nine upstream source/golden SHA-256 digests.
 A changed digest requires reviewing the copied coverage fixture before refreshing
 the recorded value in `test/coverage-provenance.test.ts`. The backend controls now
-record observed `rawResponseCount` and `matchedSpanCount`; scan and identity/parent
-booleans derive from those observations. Historical result artifacts have not been
+record observed `rawResponseCount` and `matchedSpanCount`. The readback fails before
+the scan and identity/parent booleans can be false, so they record that the readback
+run completed; the matrix audit rejects a live row whose recorded value is false.
+The counts are whole-run values shared by the live ADK rows, not per-row counts. Historical result artifacts have not been
 regenerated: this hardening run used offline tests and did not run the live stack.
 
 | Family | Scripted model / capability calls | Emitted root / node / model / capability spans | Measurement |
@@ -361,7 +363,10 @@ projections. IDs are relabelled in parent-first oracle order. Timestamps become
 fields are omitted. Typed attributes, token counts, status, model names, I/O and
 parenting are retained. Raw API bodies and credentials are never written to
 results. The Node live writer uses a local JSON serializer without a Biome subprocess.
-Offline tests compare its bytes against all four committed Node scenario files.
+Offline tests compare its bytes against all four committed Node scenario files. It
+matches Biome for the current result shapes (objects, scalar arrays, empty
+containers); long numeric arrays that Biome fills across lines are not modelled.
+The score, browser and coverage live writers still format with the root Biome binary.
 The shared readback scanner also inspects the complete Langfuse trace-detail
 response (`/api/public/traces/{traceId}`), alongside observation pages and MLflow
 envelopes, before projecting stored spans. These changes have offline coverage;

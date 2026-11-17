@@ -56,7 +56,7 @@ function row(id: RowId = 'langgraph-js', spans = emitted(records.langfuse)): Mea
     scriptedCalls: { model: 1, capability: 1 },
     ...(live ? { backends: records } : {}),
     ...(live
-      ? {}
+      ? { controls: { rawResponsesScanned: true, spanIdsAndParentsMatch: true } }
       : {
           controls: {
             modelCalls: 1,
