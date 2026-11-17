@@ -131,6 +131,11 @@ interface Script {
   fail: boolean;
   beforeFailure: Promise<void>;
   requests: Request[];
+  sibling?: {
+    started: ReturnType<typeof Promise.withResolvers<void>>;
+    release: ReturnType<typeof Promise.withResolvers<void>>;
+    held: boolean;
+  };
 }
 
 class StageModel extends BaseChatModel {
@@ -154,6 +159,15 @@ class StageModel extends BaseChatModel {
     if (!name) throw new Error('The scripted stage has no name.');
     this.script.requests.push({ agent: name, messages: mapped, tools: this.tools });
     const afterTool = mapped.at(-1)?.role === 'tool';
+    if (name === 'c' && !afterTool && this.script.sibling) {
+      const sibling = this.script.sibling;
+      if (!sibling.held) {
+        sibling.held = true;
+        sibling.started.resolve();
+        // Keep the first sibling's tool request out of the bridge until the retry reaches it.
+        await sibling.release.promise;
+      } else sibling.release.resolve();
+    }
     if (name === 'b' && afterTool && this.script.fail) {
       this.script.fail = false;
       await this.script.beforeFailure;
@@ -216,10 +230,12 @@ async function runWorkflowReplacement({
   parallel,
   retry,
   holdWrite = false,
+  cancelSibling = false,
 }: {
   parallel: boolean;
   retry: boolean;
   holdWrite?: boolean;
+  cancelSibling?: boolean;
 }): Promise<void> {
   const oracle = native[`${parallel ? 'True' : 'False'}-${retry ? 'True' : 'False'}`];
   if (!oracle) throw new Error('The native Workflow observation is missing.');
@@ -231,12 +247,22 @@ async function runWorkflowReplacement({
   const recovery = new ReceiptedRecoveryStore();
   const heldWrite = Promise.withResolvers<void>();
   const writeStarted = Promise.withResolvers<void>();
+  const sibling = {
+    started: Promise.withResolvers<void>(),
+    release: Promise.withResolvers<void>(),
+    held: false,
+  };
   const script: Script = {
     parallel,
     fail: retry,
     requests: [],
     // The control waits for dispatch only; oracle retries wait for both receipts.
-    beforeFailure: holdWrite ? writeStarted.promise : recovery.receipts.promise,
+    beforeFailure: cancelSibling
+      ? sibling.started.promise
+      : holdWrite
+        ? writeStarted.promise
+        : recovery.receipts.promise,
+    ...(cancelSibling ? { sibling } : {}),
   };
   const model = new StageModel(script);
   const invoked: number[] = [];
@@ -331,7 +357,16 @@ async function runWorkflowReplacement({
       if (holdWrite && attempt === 0) heldWrite.resolve();
       if (retry && attempt === 0) {
         expect(checkpoints.rows.size).toBe(0);
-        if (!holdWrite) {
+        if (cancelSibling) {
+          // system-design.md §8.3: succeeded receipts replay without invocation;
+          // an absent write is planned and dispatched on retry. Branch b's post-tool
+          // failure implies write 1 succeeded; c's held model has requested no write.
+          expect(errors).toEqual(['unavailable']);
+          expect(invoked).toEqual([1]);
+          expect([...recovery.journal.values()].map((record) => record.status)).toEqual([
+            'succeeded',
+          ]);
+        } else if (!holdWrite) {
           const message = `Receipt barrier requires both write receipts: ${JSON.stringify(timeline)}`;
           expect([...invoked].sort(), message).toEqual([1, 2]);
           expect(
@@ -349,6 +384,20 @@ async function runWorkflowReplacement({
     if (holdWrite) {
       expect(errors, message).toEqual(['unavailable', 'outcome_unknown']);
       expect([...invoked].sort()).toEqual([1, 2]);
+      expect(fixture.workerErrors).toEqual([]);
+      return;
+    }
+    if (cancelSibling) {
+      expect(errors, message).toEqual(['unavailable']);
+      expect(invoked).toEqual([1, 2]);
+      expect([...recovery.journal.values()].map((record) => record.status)).toEqual([
+        'succeeded',
+        'succeeded',
+      ]);
+      expect(outputs).toHaveLength(1);
+      expect(outputs[0]).toBe('merger done');
+      expect(fixture.counts.created).toBe(1);
+      expect(checkpoints.rows.size).toBeGreaterThan(0);
       expect(fixture.workerErrors).toEqual([]);
       return;
     }
@@ -385,6 +434,7 @@ async function runWorkflowReplacement({
     expect(fixture.workerErrors).toEqual([]);
   } finally {
     recovery.clear();
+    sibling.release.resolve();
     heldWrite.resolve();
     stop();
     await runtime.dispose();
@@ -410,4 +460,12 @@ test.skipIf(!pythonWheelsAvailable)(
     await runWorkflowReplacement({ parallel: true, retry: true, holdWrite: true });
   },
   900000,
+);
+
+test.skipIf(!pythonWheelsAvailable)(
+  'Workflow replacement retries a sibling cancelled before its write is dispatched',
+  async () => {
+    await runWorkflowReplacement({ parallel: true, retry: true, cancelSibling: true });
+  },
+  240000,
 );
