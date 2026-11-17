@@ -1,11 +1,14 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import { expect, test } from 'vitest';
+import { parse } from 'yaml';
+import { shared, singleCopy } from '../src/single-copy.js';
 import config from '../vitest.config.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -15,6 +18,32 @@ const probes = {
   '@langchain/core': '@langchain/core/messages',
   '@langchain/langgraph': '@langchain/langgraph',
 };
+
+test.each(shared)('single-copy guard rejects a second installed %s directory', (name) => {
+  const directory = mkdtempSync(resolve(tmpdir(), 'llmops-single-copy-'));
+  try {
+    for (const dependency of shared)
+      mkdirSync(resolve(directory, `${dependency.replace('/', '+')}@1.0.0`));
+    expect(() => singleCopy(directory)).not.toThrow();
+    mkdirSync(resolve(directory, `${name.replace('/', '+')}@2.0.0`));
+    expect(() => singleCopy(directory)).toThrow(`Multiple installed copies of ${name}`);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('isolated lock contains one version of each shared package', () => {
+  const lock = parse(readFileSync(resolve(root, 'pnpm-lock.yaml'), 'utf8')) as {
+    packages: Record<string, unknown>;
+  };
+  for (const name of shared)
+    expect(Object.keys(lock.packages).filter((key) => key.startsWith(`${name}@`))).toHaveLength(1);
+});
+
+test.skipIf(!existsSync(resolve(root, 'node_modules/.pnpm')))(
+  'isolated installed virtual store passes the single-copy guard',
+  () => expect(() => singleCopy(resolve(root, 'node_modules/.pnpm'))).not.toThrow(),
+);
 
 test('linked built packages share the runner module paths', async () => {
   const server = await createServer({

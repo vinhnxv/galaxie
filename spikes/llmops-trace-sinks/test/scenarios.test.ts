@@ -4,7 +4,7 @@
 import { SpanStatusCode } from '@opentelemetry/api';
 import { afterEach, expect, test, vi } from 'vitest';
 import { assertSpanTree, serializeSpans } from '../../../packages/core/test/span-tree.js';
-import { canary } from '../src/host.js';
+import { canary, collectorUrl } from '../src/host.js';
 import { observationsQuery, readBack } from '../src/readback.js';
 import { errorText, prompt, reply, runScenario, scenarios } from '../src/scenarios.js';
 
@@ -16,12 +16,18 @@ afterEach(() => vi.unstubAllGlobals());
 test.each([
   'observation page',
   'later observation page',
+  'Langfuse trace',
   'MLflow search',
   'MLflow detail',
   'run query page',
 ])('inspection rejects a canary in the complete %s envelope', async (target) => {
   let pages = 0;
   vi.stubGlobal('fetch', async (url: string) => {
+    if (url.includes('/api/public/traces/'))
+      return Response.json({
+        id: 'fixture-trace',
+        input: target === 'Langfuse trace' ? canary : null,
+      });
     if (url.includes('/observations?')) {
       pages++;
       return Response.json({
@@ -53,6 +59,10 @@ test.each([
       ? observationsQuery({ filter: 'fixture-run-filter' }, inspect)
       : readBack('fixture-trace', inspect);
   await expect(read).rejects.toThrow('Envelope inspection detected the credential canary');
+});
+
+test('collector destination is the local OTLP HTTP traces endpoint', () => {
+  expect(collectorUrl).toBe('http://127.0.0.1:4318/v1/traces');
 });
 
 test.each(scenarios)('%s has the expected offline oracle in both text modes', async (name) => {
@@ -88,6 +98,19 @@ test.each(scenarios)('%s has the expected offline oracle in both text modes', as
       expect(model.attributes['gen_ai.output.messages'] !== undefined).toBe(
         text && name !== 'model-failure',
       );
+      if (text) {
+        expect(JSON.parse(String(model.attributes['gen_ai.input.messages']))).toEqual([
+          { role: 'user', parts: [{ type: 'text', content: 'Synthetic Node host prompt' }] },
+        ]);
+        if (name !== 'model-failure')
+          expect(JSON.parse(String(model.attributes['gen_ai.output.messages']))).toEqual([
+            {
+              role: 'assistant',
+              parts: [{ type: 'text', content: 'Synthetic Node host reply' }],
+              finish_reason: 'stop',
+            },
+          ]);
+      }
       if (name === 'model-failure') {
         expect(model.status.code).toBe(SpanStatusCode.ERROR);
         // The credential-routed path deliberately generalizes provider error types.

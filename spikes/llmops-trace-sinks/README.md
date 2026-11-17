@@ -351,8 +351,12 @@ projections. IDs are relabelled in parent-first oracle order. Timestamps become
 `<timestamp>`; timing, project fields, service resource paths and unrelated API
 fields are omitted. Typed attributes, token counts, status, model names, I/O and
 parenting are retained. Raw API bodies and credentials are never written to
-results. The live writer uses the root's installed Biome formatter so reruns
-preserve the committed JSON format as well as values.
+results. The Node live writer uses a local JSON serializer without a Biome subprocess.
+Offline tests compare its bytes against all four committed Node scenario files.
+The shared readback scanner also inspects the complete Langfuse trace-detail
+response (`/api/public/traces/{traceId}`), alongside observation pages and MLflow
+envelopes, before projecting stored spans. These changes have offline coverage;
+the recorded live results above predate this hardening run.
 
 To repeat the stability check while the stack is up:
 
@@ -395,6 +399,13 @@ packages, API, LangChain and LangGraph resolve through the same single-copy help
 as the Node runner. The production build independently counts one resolved copy
 of each shared package. No vendor SDK or backend dependency enters a galaxie
 package.
+
+Before Vite starts, the helper rejects multiple matching package directories
+(including peer-context variants) for API, LangChain core and LangGraph in this
+spike's `node_modules/.pnpm`. Offline tests also require exactly one locked version
+of each. This inventory guard does not inspect the root or linked packages'
+virtual stores, vendored or bundled copies, or code loaded outside Vite's resolver.
+Resolver tests separately check canonical paths through linked built exports.
 
 Vite preview binds only loopback on a free port. Its single proxy route rewrites
 `/otel/v1/traces` to the collector's `/v1/traces` receiver path. Preview serves the

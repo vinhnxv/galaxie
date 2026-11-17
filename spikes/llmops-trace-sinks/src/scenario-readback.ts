@@ -220,7 +220,7 @@ export async function scenarioReadback(result: ScenarioResult): Promise<unknown>
           ? mfAttributes['mlflow.spanType']
           : null,
       kind: span.kind ?? null,
-      status: span.status?.code ?? 'UNSET',
+      status: span.status?.code ?? 'STATUS_CODE_UNSET',
       attributes: attributes(mfAttributes),
       model:
         typeof mfAttributes['mlflow.llm.model'] === 'string'
