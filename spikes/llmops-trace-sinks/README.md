@@ -439,6 +439,12 @@ default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; bas
 [browser-linear.json](results/browser-linear.json) and
 [browser-interrupt-resume.json](results/browser-interrupt-resume.json) exactly
 match their Node counterparts, with **no lane-specific attribute exceptions**.
+This equality covers the shared projection: span attributes keep `galaxie.*`,
+`gen_ai.*`, `session.id`, `error.type`, `langfuse.observation.*`, and MLflow's
+`spanType`, `spanInputs`, `spanOutputs`, `chat.tokenUsage` and `llm.*` keys.
+Resource attributes and other span attributes are dropped before lane comparison;
+resource parity is not measured. Comparing resources would require extending the
+backend projection and regenerating live evidence, so this cycle documents the limit.
 The shared readback checks compare every backend span with the page's in-memory
 oracle, pin counts independently, inspect complete API responses before
 projection, and require positive credential calls and opted-in text. The JSON
@@ -459,7 +465,9 @@ and the routed canary. A short numeric experiment identifier is checked in URL
 segments, query values and header values, excluding Chromium's standardized
 `upgrade-insecure-requests` protocol bit. That bit still receives all credential
 and canary checks. Bodies and bundle numbers are not interpreted as experiment
-identifiers. Synthetic positive controls exercise both scanners. No generated
+identifiers. Header values also match embedded experiment identifiers of at least
+eight characters; shorter identifiers require equality to avoid unrelated numeric
+metadata matches. Synthetic positive controls exercise both scanners. No generated
 credential appeared in the bundle or either request capture. No page request or
 complete backend response contained the routed canary. Generated credentials in
 complete backend responses were not scanned; the separate static guard checks
@@ -473,6 +481,10 @@ error, which the dedicated control deliberately counts. Proxied runs have no
 `connect-src` violation. No eval or other CSP violation was observed. URLs in the
 recorded control are replaced with destination labels; ports and local paths are
 not persisted.
+This shows CSP as the first blocker, not the only one: the collector has no CORS
+configuration. No counterfactual without CSP was run. The recorded four violations
+are one observation; CSP violation counts may vary with exporter and browser timing.
+Playwright and receiver POST counts may also vary with navigation keepalive timing.
 
 [browser-close.json](results/browser-close.json) records observations, without a
 delivery assertion. Each case has a 60-second batch delay and a 15-second backend
@@ -484,8 +496,13 @@ observation window:
 | Navigate away, no explicit flush | SDK default | 3 / 3 of 3 |
 | Explicit force-flush and shutdown, then close | SDK default | 3 / 3 of 3 |
 
+The harness now also includes immediate `page.close()` with SDK default auto flush,
+separating the batch option from the close mechanism. That fourth case has not been
+measured: the committed result above predates this offline hardening cycle.
+
 The lifecycle field lists only callbacks successfully relayed to Playwright;
 callbacks during document destruction are not a complete browser event log.
+Relayed lifecycle callback counts and delivered span counts may vary between runs.
 The counts demonstrate sampled delivery, not a delivery guarantee. No `pagehide`
 or `sendBeacon` mitigation was added.
 

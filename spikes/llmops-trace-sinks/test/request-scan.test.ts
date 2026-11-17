@@ -120,6 +120,26 @@ test.each([
   expect(scanRequests([request(overrides)], env, canary)).toContain('request[0]:experiment-id');
 });
 
+test('long experiment identifiers embedded in header values are detected', () => {
+  expect(
+    scanRequests(
+      [request({ headers: { 'x-fixture': 'route=experiment-12345; sampled=true' } })],
+      { ...env, MLFLOW_EXPERIMENT_ID: 'experiment-12345' },
+      canary,
+    ),
+  ).toContain('request[0]:experiment-id');
+});
+
+test('short experiment identifiers do not match substrings of unrelated metadata', () => {
+  expect(
+    scanRequests(
+      [request({ headers: { 'x-fixture': 'value=1234567; count=70' } })],
+      { ...env, MLFLOW_EXPERIMENT_ID: '1234567' },
+      canary,
+    ),
+  ).toEqual([]);
+});
+
 test('request capture keeps full headers and bytes for scanning, and summaries omit values and query strings', async () => {
   const captured = await captureRequest({
     url: () => `http://127.0.0.1:4318/otel/v1/traces?hidden=${secret}`,
