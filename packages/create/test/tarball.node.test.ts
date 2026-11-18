@@ -51,10 +51,10 @@ async function archive(
   }
 }
 
-async function fixture(): Promise<{ root: string; packed: string }> {
+async function fixture(directory = 'packed'): Promise<{ root: string; packed: string }> {
   const root = await mkdtemp(join(tmpdir(), 'galaxie-tarballs-'));
   onTestFinished(() => rm(root, { recursive: true, force: true }));
-  const packed = join(root, 'packed');
+  const packed = join(root, directory);
   await mkdir(packed);
   for (const name of names) await archive(packed, name, '0.1.0');
   return { root, packed };
@@ -303,7 +303,8 @@ test.each([
 ] as const)(
   'the %s CLI scaffolds local tarballs and suppresses install scripts',
   async (manager, version, flag) => {
-    const { root, packed } = await fixture();
+    const { root, packed } = await fixture(manager === 'yarn' ? 'packed #%::' : 'packed');
+    const reference = manager === 'yarn' ? join(root, 'packed %23%25%3A%3A') : packed;
     const installs: unknown[] = [];
     expect(
       await run(['my-app', 'browser-only', 'langgraph-js'], {
@@ -313,17 +314,24 @@ test.each([
         stderr: new PassThrough(),
         env: { GALAXIE_CREATE_PACKAGE_DIR: packed, npm_config_user_agent: `${manager}/${version}` },
         platform: 'linux',
-        runner: async ({ executable, args, shell }) => {
-          installs.push({ executable, args, shell });
+        runner: async ({ executable, args, shell, env }) => {
+          installs.push({ executable, args, shell, ignoreScripts: env['YARN_IGNORE_SCRIPTS'] });
         },
       }),
     ).toBe(0);
-    expect(installs).toEqual([{ executable: manager, args: ['install', flag], shell: false }]);
+    expect(installs).toEqual([
+      {
+        executable: manager,
+        args: ['install', flag],
+        shell: false,
+        ignoreScripts: manager === 'yarn' ? 'true' : undefined,
+      },
+    ]);
     const project = join(root, 'my-app');
     const source = await readFile(join(project, 'package.json'), 'utf8');
     const manifest = JSON.parse(source);
     expect(manifest.dependencies['@galaxie-ai/core']).toBe(
-      `file:${packed}/galaxie-ai-core-0.1.0.tgz`,
+      `file:${reference}/galaxie-ai-core-0.1.0.tgz`,
     );
     expect(manifest.dependencies.react).toBe('19.3.1');
     expect(manifest).not.toHaveProperty('overrides');
@@ -335,10 +343,14 @@ test.each([
       expect(manifest).not.toHaveProperty('resolutions');
       expect(existsSync(join(project, '.yarnrc.yml'))).toBe(false);
     } else {
+      expect(manifest.packageManager).toBe('yarn@4.18.1');
       expect(manifest.dependencies['@opentelemetry/api']).toBe('1.10.0');
       expect(manifest.dependencies['@langchain/langgraph-checkpoint']).toBe('1.2.2');
       const resolutions = Object.fromEntries(
-        names.map((name) => [`@galaxie-ai/${name}`, `file:${packed}/galaxie-ai-${name}-0.1.0.tgz`]),
+        names.map((name) => [
+          `@galaxie-ai/${name}`,
+          `file:${reference}/galaxie-ai-${name}-0.1.0.tgz`,
+        ]),
       );
       expect(manifest.resolutions).toEqual(resolutions);
       expect(source).toContain(

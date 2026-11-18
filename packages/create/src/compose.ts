@@ -4,7 +4,13 @@
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import type { Layer } from './layers.js';
 import { isObject, type JsonObject, mergeFragments } from './merge.js';
-import { type PackageManager, requiredPackages, TarballError, type Tarballs } from './packages.js';
+import {
+  type PackageManager,
+  requiredPackages,
+  TarballError,
+  type Tarballs,
+  tarballYarnPin,
+} from './packages.js';
 import { validateOutputPath, validateProjectName } from './paths.js';
 
 export interface ProjectFile {
@@ -163,7 +169,10 @@ export function compose(layers: readonly Layer[], options: ComposeOptions): Comp
       const path = options.tarballs.get(name);
       if (path === undefined || !isAbsolute(path))
         throw new TarballError(`Expected an absolute tarball path for ${name}.`);
-      tarballOverrides[name] = `file:${path}`;
+      // Yarn reserves these delimiters inside file: locators.
+      const reference =
+        options.packageManager === 'yarn' ? path.replace(/%|#|::/g, encodeURIComponent) : path;
+      tarballOverrides[name] = `file:${reference}`;
     }
     for (const section of [
       'dependencies',
@@ -182,6 +191,7 @@ export function compose(layers: readonly Layer[], options: ComposeOptions): Comp
         }
     }
     if (options.packageManager === 'yarn') {
+      manifest['packageManager'] = tarballYarnPin;
       // Yarn does not auto-install missing peers at the project root.
       const dependencies = manifest['dependencies'];
       if (isObject(dependencies)) {

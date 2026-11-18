@@ -632,14 +632,14 @@ and wiring result, not a model-quality or device-performance measurement.
 ## Failure records and offline proof
 
 The JSON output is an array of results: `template`, verified `node` (or the requested
-major if version resolution fails), exact `npm` (or `unknown` before its probe),
-`mode`, `releaseAgeDays`, `exclude`, `browser`, `durationMs`, `serverDurationMs`
-and `failures`. Each failure contains
+major if version resolution fails), `packageManager`, exact `packageManagerVersion`
+(or `unknown` before its probe), `mode`, `releaseAgeDays`, `exclude`, `browser`, `durationMs`, `serverDurationMs`
+and `failures`. npm results also retain the `npm` version field. Each failure contains
 `phase`, `gating`, `source`, `suggested`, `summary` and `excerpt`; the parent result
 supplies the combination/node/mode identity. Current phases are node, pack,
 scaffold, install, build, check, negative-control, compile, serve, drive, probe and budget.
 All current failures are gating; the earlier advisory source check has been
-replaced by `npm run check`. Suggested sources are template, `package:<name>`, environment,
+replaced by the generated project's `check` script. Suggested sources are template, `package:<name>`, environment,
 harness or unclassified; triage must confirm them. Excerpts replace the temporary
 root, HOME, URLs and credential-like fields and are capped at 16 lines/4000
 characters. Any gating or unclassified failure causes exit 1; usage errors exit 2.

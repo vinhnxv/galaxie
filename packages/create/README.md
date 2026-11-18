@@ -58,7 +58,8 @@ Types baseline. The gateway check also compiles and probes its static handler, r
 The CLI detects npm, pnpm or yarn from `npm_config_user_agent`, defaults to npm,
 and prints a fallback note for another manager in registry mode. It runs
 `<manager> install --ignore-scripts` without a shell. Yarn 4 tarball mode uses
-`yarn install --mode=skip-build`. `--no-install` skips this
+`yarn install --mode=skip-build` with the Yarn 4.18.1 Corepack pin.
+`--no-install` skips this
 step. On Windows automatic installation is skipped and the command is printed.
 An install failure leaves the generated files and prints the manual command.
 The CLI does not change registry or release-age configuration.

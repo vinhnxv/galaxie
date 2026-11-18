@@ -16,6 +16,7 @@ export const knownPackages: readonly string[] = [
 ];
 export type Tarballs = ReadonlyMap<string, string>;
 export type PackageManager = 'npm' | 'pnpm' | 'yarn';
+export const tarballYarnPin: string = 'yarn@4.18.1';
 export { TarballError } from './tarball.js';
 
 export function requiredPackages(framework: string): readonly string[] {

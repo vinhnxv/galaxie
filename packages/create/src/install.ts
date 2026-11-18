@@ -54,13 +54,16 @@ export async function install(
   } = {},
 ): Promise<boolean> {
   if ((options.platform ?? process.platform) === 'win32') return false;
+  const yarnTarballs = options.tarballMode === true && packageManager === 'yarn';
   const flag = installFlag(packageManager, options.tarballMode === true);
+  const env = options.env ?? process.env;
   try {
     await (options.runner ?? spawnInstall)({
       executable: packageManager,
       args: ['install', flag],
       cwd,
-      env: options.env ?? process.env,
+      // Yarn Classic ignores --mode=skip-build if it bypasses the Corepack pin.
+      env: yarnTarballs ? { ...env, YARN_IGNORE_SCRIPTS: 'true' } : env,
       shell: false,
     });
     return true;

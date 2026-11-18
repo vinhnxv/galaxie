@@ -300,7 +300,8 @@ export async function assertManagedTarballs(
       )
         throw mismatch(name);
     } else {
-      const prefix = `${name}@file:${path}#${path}::`;
+      const escapedPath = path.replace(/%|#|::/g, encodeURIComponent);
+      const prefix = `${name}@file:${escapedPath}#${escapedPath}::`;
       const checksum = record['checksum'];
       // Yarn's locator records a short hash of the .tgz. Its full checksum covers the cache zip.
       if (

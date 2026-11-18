@@ -121,7 +121,10 @@ function managedLock(
   manager: 'pnpm' | 'yarn',
   archives: ReadonlyMap<string, string>,
 ): Record<string, unknown> {
-  const entries = [...archives].map(([name, path]) => [`${name}@file:${path}`, path] as const);
+  const entries = [...archives].map(([name, path]) => {
+    const reference = manager === 'yarn' ? path.replaceAll('#', '%23') : path;
+    return [`${name}@file:${reference}`, reference] as const;
+  });
   return manager === 'pnpm'
     ? {
         lockfileVersion: '9.0',
@@ -492,7 +495,7 @@ it.each(['pnpm', 'yarn'] as const)(
   async (manager) => {
     const root = await temporary();
     const name = '@galaxie-ai/core';
-    const path = join(root, 'core.tgz');
+    const path = join(root, manager === 'yarn' ? 'core #.tgz' : 'core.tgz');
     await writeFile(path, archiveFixture);
     const archives = new Map([[name, path]]);
     const key = `${name}@file:${path}`;
@@ -504,9 +507,8 @@ it.each(['pnpm', 'yarn'] as const)(
       assertManagedTarballs(manager, text, root, archives, [name]);
     await expect(verify(lock)).resolves.toBeUndefined();
     await expect(verify(managedLock(manager, new Map()))).rejects.toThrow(name);
-    await expect(verifyText(source.replaceAll(path, join(root, 'wrong.tgz')))).rejects.toThrow(
-      name,
-    );
+    const reference = manager === 'yarn' ? 'core %23.tgz' : 'core.tgz';
+    await expect(verifyText(source.replaceAll(reference, 'wrong.tgz'))).rejects.toThrow(name);
     const registryKey = `${name}@npm:0.2.0`;
     if (manager === 'pnpm') {
       const packages = lock['packages'] as Record<string, unknown>;

@@ -27,7 +27,7 @@ Do not duplicate guidance in templates, change CSP/Trusted Types output or add g
 ## Limits
 
 Packed distributions include templates and the galaxie skill; checkout runs fall back to repository sources.
-Prepack refreshes these ignored copies, and postpack removes them; `pnpm run clean:pack` also removes them. Tarball installs support npm only; other managers remain unproven.
+Prepack refreshes these ignored copies, and postpack removes them; `pnpm run clean:pack` also removes them. Tarball installs support npm, pnpm 11 and Yarn 4. The standalone verification record lists the measured combinations.
 Filesystem checks and exclusive creates do not establish isolation from other processes with write access.
 Agent consumption of the skill, release-tag installation and Windows installer behavior are unmeasured.
 
