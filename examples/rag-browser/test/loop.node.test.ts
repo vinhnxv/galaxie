@@ -874,7 +874,8 @@ pythonTest.each(answerExecutors)(
       await page.context().close();
     }
   },
-  60000,
+  // The CI python-rest job (run 44227653063) took 48.7 s for pydantic-ai and 51.1 s for DSPy.
+  120_000,
 );
 
 pythonTest(
@@ -1136,7 +1137,8 @@ pythonTest(
       await page.context().close();
     }
   },
-  60000,
+  // Restoring the Python review took 26.8 s on the CI python-rest runner.
+  90_000,
 );
 
 for (const executor of ['javascript', 'python'] as const) {
@@ -1187,7 +1189,8 @@ for (const executor of ['javascript', 'python'] as const) {
         await page.context().close();
       }
     },
-    60000,
+    // CI python-rest took 27.8 s for Python and 2.1 s for JavaScript.
+    executor === 'python' ? 90_000 : 60_000,
   );
 
   test.skipIf(executor === 'python' && !pythonWheelsAvailable)(
@@ -1296,7 +1299,8 @@ for (const executor of ['javascript', 'python'] as const) {
         await page.context().close();
       }
     },
-    60000,
+    // CI python-rest took 40.3 s for Python and 3.3 s for JavaScript.
+    executor === 'python' ? 120_000 : 60_000,
   );
 }
 
@@ -1396,7 +1400,8 @@ pythonTest(
       await page.context().close();
     }
   },
-  60000,
+  // The cancel, clear and exit sequence took 25.7 s on the CI python-rest runner.
+  90_000,
 );
 
 pythonTest(

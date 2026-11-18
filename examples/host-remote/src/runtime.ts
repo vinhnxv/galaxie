@@ -35,6 +35,7 @@ export interface RemoteHost {
   readonly runtime: Runtime;
   readonly registry: Registry;
   readonly confirmations: ConfirmationRegistry;
+  endSession(): Promise<void>;
   createInstance(): Promise<AgentInstance<TutorInput, unknown>>;
 }
 
@@ -87,6 +88,7 @@ export async function createRemoteHost(
     runtime,
     registry,
     confirmations,
+    endSession: token.end,
     createInstance: async () => {
       const { bindings, modelRouting, endpoints } = buildHostConfig(validated);
       const endpoint = endpoints['quiz'];

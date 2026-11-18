@@ -1,9 +1,22 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { UserConfig } from 'vite';
+import { fileURLToPath } from 'node:url';
+import { normalizePath, type UserConfig } from 'vite';
+
+const main = normalizePath(fileURLToPath(new URL('./src/main.tsx', import.meta.url)));
 
 const config: UserConfig = {
   define: { 'process.env.ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS': '"false"' },
+  plugins: [
+    {
+      name: 'galaxie-starter-zod',
+      transform(code, id) {
+        // Configure Zod before the app imports the renderer's schemas.
+        if (id === main) return { code: `import './zod-config.js';\n${code}`, map: null };
+        return undefined;
+      },
+    },
+  ],
 };
 export default config;

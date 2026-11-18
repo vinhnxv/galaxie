@@ -88,6 +88,11 @@ export function backend(options: { now?: () => number; upstreamKey?: string } = 
     else server.once('listening', listening);
     const sessions = new Map<string, Session>();
     const cookieSessions = new Map<string, Session>();
+    let nextSweepAt = -Infinity;
+    const removeSession = (session: Session): void => {
+      sessions.delete(session.token);
+      cookieSessions.delete(session.cookie);
+    };
     const proxyBodies: unknown[] = [];
     const proxyHeaderNames: string[][] = [];
     const progress: (ProgressInput & { learnerId: string })[] = [];
@@ -117,9 +122,17 @@ export function backend(options: { now?: () => number; upstreamKey?: string } = 
       if (issueRoute) {
         // Demo-only open issuance: a real host must require its own signed-in user here.
         count(route);
+        const issuedAt = now();
+        // Sweep on issuance, at most once a minute, without a background timer.
+        if (issuedAt >= nextSweepAt) {
+          for (const session of sessions.values()) {
+            if (session.expiresAt <= issuedAt) removeSession(session);
+          }
+          nextSweepAt = issuedAt + 60_000;
+        }
         const token = randomUUID();
         const cookie = randomUUID();
-        const expiresAt = now() + 300_000;
+        const expiresAt = issuedAt + 300_000;
         const session = { token, cookie, learnerId: 'demo-learner', expiresAt };
         sessions.set(token, session);
         cookieSessions.set(cookie, session);
@@ -131,10 +144,7 @@ export function backend(options: { now?: () => number; upstreamKey?: string } = 
       const cookieSession = cookie === undefined ? undefined : cookieSessions.get(cookie);
       if (endRoute) {
         count(route);
-        if (cookieSession) {
-          sessions.delete(cookieSession.token);
-          cookieSessions.delete(cookieSession.cookie);
-        }
+        if (cookieSession) removeSession(cookieSession);
         response.setHeader('set-cookie', sessionCookie('', 0));
         json(response, 200, { ended: true });
         return;
@@ -151,7 +161,14 @@ export function backend(options: { now?: () => number; upstreamKey?: string } = 
       }
       if (route === 'GET /api/__test/state' && testMode) {
         count(route);
-        json(response, 200, { proxyBodies, proxyHeaderNames, progress, requests });
+        json(response, 200, {
+          proxyBodies,
+          proxyHeaderNames,
+          progress,
+          requests,
+          sessions: sessions.size,
+          cookieSessions: cookieSessions.size,
+        });
       } else if (request.method === 'GET' && path.startsWith('/api/lessons/')) {
         count('GET /api/lessons/:lessonId');
         json(

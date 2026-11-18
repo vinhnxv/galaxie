@@ -64,6 +64,7 @@ export function App(): ReactElement {
   const [decision, setDecision] = useState<{ respond: (allow: boolean) => void }>();
   const [error, setError] = useState<string>();
   const [starting, setStarting] = useState(false);
+  const [ending, setEnding] = useState(false);
   const busy = useRef(false);
   const current = useRef<RemoteHost | undefined>(undefined);
   const mounted = useRef(true);
@@ -143,11 +144,23 @@ export function App(): ReactElement {
     }
   };
   const startOver = (): void => {
-    void current.current?.runtime.dispose().catch(() => {});
+    const host = current.current;
+    if (!host) return;
     current.current = undefined;
     setActive(undefined);
     setDecision(undefined);
     setError(undefined);
+    setEnding(true);
+    void host.runtime
+      .dispose()
+      .catch(() => {})
+      .then(() => host.endSession())
+      .catch(() => {
+        if (mounted.current) setError('The demo session could not be ended.');
+      })
+      .finally(() => {
+        if (mounted.current) setEnding(false);
+      });
   };
   return (
     <main>
@@ -160,7 +173,7 @@ export function App(): ReactElement {
           {error && <p role="alert">{error}</p>}
           <button
             type="button"
-            disabled={starting}
+            disabled={starting || ending}
             onClick={() => {
               void start();
             }}

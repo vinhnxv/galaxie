@@ -200,6 +200,31 @@ it('rejects expired and duplicate model cookies', async () => {
   expect((await post(cookie)).status).toBe(401);
 });
 
+it('sweeps both indexes when issuing sessions after their expiry', async () => {
+  const { origin, advance } = await serve();
+  await issueSession(origin);
+  await issueSession(origin);
+  advance(240_000);
+  const live = await issueSession(origin);
+  const state = async (): Promise<unknown> => {
+    const response = await fetch(`${origin}/api/__test/state`, {
+      headers: { authorization: `Bearer ${live.token}` },
+    });
+    expect(response.status).toBe(200);
+    return response.json();
+  };
+  expect(await state()).toMatchObject({ sessions: 3, cookieSessions: 3 });
+  advance(60_000);
+  await issueSession(origin);
+  expect(await state()).toMatchObject({ sessions: 2, cookieSessions: 2 });
+  const response = await fetch(`${origin}/api/v1/chat/completions`, {
+    method: 'POST',
+    headers: { origin, cookie: live.cookie },
+    body: '{}',
+  });
+  expect(response.status).toBe(200);
+});
+
 it('ends the cookie-identified session and clears the cookie even without a live session', async () => {
   const { origin, advance } = await serve();
   const session = await issueSession(origin);

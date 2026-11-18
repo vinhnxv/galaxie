@@ -80,6 +80,11 @@ it(
     await context.addInitScript(() => {
       Object.defineProperty(globalThis, 'LanguageModel', { configurable: true, value: undefined });
       Object.defineProperty(navigator, 'gpu', { configurable: true, value: undefined });
+      const violations: string[] = [];
+      Reflect.set(globalThis, 'starterViolations', violations);
+      addEventListener('securitypolicyviolation', (event) =>
+        violations.push(event.effectiveDirective),
+      );
     });
     const requests: string[] = [];
     const errors: string[] = [];
@@ -90,6 +95,9 @@ it(
     });
     const page = await context.newPage();
     page.on('pageerror', (error) => errors.push(error.message));
+    page.on('console', (message) => {
+      if (message.type() === 'error') errors.push(message.text());
+    });
     try {
       const response = await page.goto(origin);
       expect(response?.headers()['content-security-policy']).toContain(
@@ -101,6 +109,7 @@ it(
         sessionStorage.getItem('local-only-template.local-demo-principal.session'),
       );
       expect(saved).not.toBeNull();
+      expect(await page.evaluate(() => Reflect.get(globalThis, 'starterViolations'))).toEqual([]);
       await page.reload();
       await page.getByRole('radio', { name: '4', exact: true }).waitFor();
       expect(await page.locator('form').textContent()).toBe(question);
@@ -127,6 +136,7 @@ it(
       } else {
         expect(requests.some((url) => /webllm|\.wasm|huggingface|\.hf\.co/.test(url))).toBe(false);
       }
+      expect(await page.evaluate(() => Reflect.get(globalThis, 'starterViolations'))).toEqual([]);
       expect(errors).toEqual([]);
     } finally {
       await context.close();

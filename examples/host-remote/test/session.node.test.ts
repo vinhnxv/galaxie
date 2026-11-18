@@ -48,3 +48,53 @@ test('a stalled session request ends at its deadline and a later call starts a n
   await expect(token()).resolves.toBe('fresh-token');
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });
+
+test.each([200, 503])('ending a session clears its cached token after HTTP %i', async (status) => {
+  const origin = 'http://127.0.0.1:4321';
+  const expiresAt = Date.now() + 300_000;
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ token: 'old-token', expiresAt }))
+    .mockResolvedValueOnce(new Response(null, { status }))
+    .mockResolvedValueOnce(Response.json({ token: 'new-token', expiresAt }));
+  vi.stubGlobal('fetch', fetchMock);
+  const token = createSession(origin);
+  await expect(token()).resolves.toBe('old-token');
+  const ended = token.end();
+  if (status === 200) await expect(ended).resolves.toBeUndefined();
+  else await expect(ended).rejects.toMatchObject({ code: 'unavailable' });
+  expect(fetchMock).toHaveBeenNthCalledWith(2, `${origin}/api/v1/session/end`, {
+    method: 'POST',
+    headers: { origin },
+    credentials: 'same-origin',
+    redirect: 'error',
+    cache: 'no-store',
+    signal: expect.any(AbortSignal),
+  });
+  await expect(token()).resolves.toBe('new-token');
+  expect(fetchMock).toHaveBeenNthCalledWith(3, `${origin}/api/session`, expect.any(Object));
+});
+
+test('ending waits for in-flight issuance before allowing a new session to issue', async () => {
+  const { promise, resolve } = Promise.withResolvers<Response>();
+  const { promise: ended, resolve: resolveEnd } = Promise.withResolvers<Response>();
+  const expiresAt = Date.now() + 300_000;
+  const fetchMock = vi
+    .fn()
+    .mockReturnValueOnce(promise)
+    .mockReturnValueOnce(ended)
+    .mockResolvedValueOnce(Response.json({ token: 'new-token', expiresAt }));
+  vi.stubGlobal('fetch', fetchMock);
+  const token = createSession('http://127.0.0.1');
+  const issued = token();
+  const ending = token.end();
+  const next = token();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  resolve(Response.json({ token: 'old-token', expiresAt }));
+  await expect(issued).resolves.toBe('old-token');
+  await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  expect(fetchMock.mock.calls[1]?.[0]).toBe('http://127.0.0.1/api/v1/session/end');
+  resolveEnd(new Response());
+  await ending;
+  await expect(next).resolves.toBe('new-token');
+});

@@ -101,6 +101,13 @@ it(
         } else await route.continue();
       });
       const page = await context.newPage();
+      await page.addInitScript(() => {
+        const violations: string[] = [];
+        Reflect.set(globalThis, 'starterViolations', violations);
+        addEventListener('securitypolicyviolation', (event) =>
+          violations.push(event.effectiveDirective),
+        );
+      });
       page.on('pageerror', (error) => errors.push(error.message));
       page.on('console', (message) => {
         if (message.type() === 'error') errors.push(message.text());
@@ -146,13 +153,8 @@ it(
         expect(urls.filter((url) => url.endsWith('/go/agent.wasm'))).toHaveLength(1);
         expect(urls.filter((url) => /go-worker.*\.js/.test(url))).toHaveLength(1);
       } else expect(urls.some((url) => /\.wasm|go-worker/.test(url))).toBe(false);
-      // Zod probes eval support once with `new Function('')`. The CSP blocks that caught probe, which
-      // logs this one message and falls back to schemas without code generation. Nothing else may log.
-      const evalProbe = "This document requires 'TrustedScript' assignment.";
-      expect(errors.filter((message) => !message.startsWith(evalProbe))).toEqual([]);
-      expect(errors.filter((message) => message.startsWith(evalProbe)).length).toBeLessThanOrEqual(
-        1,
-      );
+      expect(await page.evaluate(() => Reflect.get(globalThis, 'starterViolations'))).toEqual([]);
+      expect(errors).toEqual([]);
       expect(server.records).toHaveLength(1);
       expect(modelRoles).toHaveLength(1);
       expect(promptIds).toEqual(['practice-comment']);
