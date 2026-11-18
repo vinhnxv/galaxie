@@ -74,6 +74,7 @@ interface RunRecord {
   readonly renderOutcomes: Map<string, 'rendered' | 'failed'>;
   readonly surfaceRevisions: Map<string, number>;
   submittedText?: boolean;
+  pendingRestoredText?: boolean;
   dispatching?: InteractionId;
   segment?: SegmentRecord;
   readonly events: RunEvents;
@@ -624,7 +625,9 @@ export function createAgentInstance(
         case 'stream':
           break;
       }
-      run.events.append(event);
+      const recorded = run.events.append(event);
+      if (recorded.type === 'output' && segment.tracing?.recorder.recordsText)
+        segment.tracing.recordOutput(recorded.output);
       publish(run.events);
     };
     const submission = segment.submission;
@@ -687,10 +690,21 @@ export function createAgentInstance(
         {
           ...(instrumentation.developmentTraceText === undefined
             ? {}
-            : { developmentTraceText: instrumentation.developmentTraceText }),
+            : {
+                developmentTraceText: {
+                  destination: instrumentation.developmentTraceText.destination,
+                  root: {
+                    input: command.type === 'start' ? command.input : undefined,
+                    unlabelledString: broker.unlabelledStartString,
+                    payloadBytes: instrumentation.limits.payloadBytes,
+                  },
+                },
+              }),
           policy: instrumentation.policy,
-          labels: () =>
-            run.submittedText ? new Set<DataLabel>([...run.labels, 'private-user']) : run.labels,
+          labels: (root) =>
+            run.submittedText || (root && run.pendingRestoredText)
+              ? new Set<DataLabel>([...run.labels, 'private-user'])
+              : run.labels,
         },
       );
       const ports = {
@@ -1250,7 +1264,15 @@ export function createAgentInstance(
         try {
           const committed = await executor?.pending(sessionId, {
             registerRestoredData(value: unknown): void {
-              registerPrivate(payloadStrings(value), run.privateValues);
+              const strings = payloadStrings(value);
+              if (instrumentation.developmentTraceText !== undefined && !run.pendingRestoredText) {
+                const first = strings.next();
+                if (first.done) return;
+                // Pending inspection can finish before the paused root closes.
+                run.pendingRestoredText = true;
+                registerPrivate([first.value], run.privateValues);
+              }
+              registerPrivate(strings, run.privateValues);
             },
           });
           if (

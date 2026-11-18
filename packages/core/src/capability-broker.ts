@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { type Annotations, readAnnotations } from './annotations.js';
+import { type Annotations, compileAnnotations, readAnnotations } from './annotations.js';
 import { BudgetExceeded, deadlineTimer, type RunBudget } from './budgets.js';
 import type {
   CapabilityBinding,
@@ -292,6 +292,7 @@ export interface BrokerRun {
 /** One broker per instance: grants and concurrency never cross principals or instances. */
 export class CapabilityBroker {
   readonly input: Annotations;
+  readonly unlabelledStartString: (value: string) => boolean;
   readonly #confirmations: ConfirmationGate | undefined;
   readonly #capabilities = new Map<string, Compiled>();
   readonly #policy: Policy;
@@ -311,7 +312,11 @@ export class CapabilityBroker {
     this.#principal = principal;
     this.#report = report;
     this.#agent = Object.freeze({ id: definition.id, version: definition.version, hash: '' });
-    const cache = new Map<Schema, Annotations>();
+    const inputSchema = definition.input;
+    const input = compileAnnotations(inputSchema);
+    this.input = input.annotations;
+    this.unlabelledStartString = input.unlabelledString;
+    const cache = new Map<Schema, Annotations>([[inputSchema, this.input]]);
     const annotations = (schema: Schema): Annotations => {
       const found = cache.get(schema);
       if (found !== undefined) return found;
@@ -319,7 +324,6 @@ export class CapabilityBroker {
       cache.set(schema, result);
       return result;
     };
-    this.input = annotations(definition.input);
     const requests = new Map<string, CapabilityRequest>([
       ...Object.entries(definition.capabilities?.required ?? {}),
       ...Object.entries(definition.capabilities?.optional ?? {}),

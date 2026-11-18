@@ -18,7 +18,7 @@ export class RunEvents {
     this.runId = runId;
   }
 
-  append(event: ExecutorEvent | HostEvent): void {
+  append(event: ExecutorEvent | HostEvent): RunEvent {
     const recorded = Object.freeze({
       ...event,
       eventId: globalThis.crypto.randomUUID() as EventId,
@@ -28,6 +28,7 @@ export class RunEvents {
     if (event.type !== 'stream') this.buffer.push(recorded);
     for (const consumer of this.consumers) consumer.append(recorded);
     this.ended = ['output', 'error', 'cancelled'].includes(event.type);
+    return recorded;
   }
 
   /** Called after the corresponding snapshot has been replaced. */

@@ -9,8 +9,11 @@ import {
   type DestinationClass,
   type DiagnosticEvent,
   defineAgentDefinition,
+  type ExecutorEvent,
   galaxieField,
+  httpCapability,
   type InteractionId,
+  type Schema,
   type ViewRevision,
 } from '@galaxie-ai/core';
 import { MockChatModel } from '@galaxie-ai/models/mock';
@@ -23,13 +26,14 @@ import {
   SimpleSpanProcessor,
   TracerProvider,
 } from '@opentelemetry/sdk-trace';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { z } from 'zod';
 import {
   binding,
   collect,
   FakeExecutor,
   definition as fakeDefinition,
+  stream,
 } from '../../packages/core/test/fake-executor.js';
 import { assertSpanTree, serializeSpans } from '../../packages/core/test/span-tree.js';
 import { cases } from './cases/index.js';
@@ -605,7 +609,7 @@ const treeCredential = 'at36-credential-canary';
 const treeError = 'at36-error-message-canary';
 const treePrompt = 'at36 model input';
 
-async function completeSpanTree(failed: boolean, text: boolean) {
+async function completeSpanTree(failed: boolean, text: boolean, dataPolicy?: DataPolicy) {
   const exporter = new InMemorySpanExporter();
   const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
   const credentials: string[] = [];
@@ -615,6 +619,7 @@ async function completeSpanTree(failed: boolean, text: boolean) {
     executors: [createLangGraphAdapter()],
     tracerProvider: provider,
     ...(text ? { developmentTraceText: { destination: 'third-party' as const } } : {}),
+    ...(dataPolicy === undefined ? {} : { dataPolicy }),
   });
   const model = new MockChatModel({
     [treePrompt]: failed
@@ -839,9 +844,488 @@ test('deep accepted JSON submission stays within budget and suppresses resumed t
     expect(
       spans.filter((span) => span.attributes['gen_ai.operation.name'] === 'chat'),
     ).toHaveLength(1);
-    expectNoText(spans);
+    expectNoText(spans.filter((span) => !isRoot(span)));
+    expectRootText(spans, ['waiting_input', 'public input'], ['succeeded']);
   } finally {
     await runtime.dispose();
     await provider.shutdown();
   }
+});
+
+const rootInput = 'at36-user-typed-canary';
+const rootOutput = 'at36 agent reply';
+const streamCanary = 'at36-raw-stream-canary';
+const leaseCanary = 'at36-lease-credential-canary';
+const bearerCanary = 'at36-http-bearer-canary';
+const pendingCanary = 'at36-pending-interaction-canary';
+const inboxCanary = 'at36-inbox-submission-canary';
+const restoredCanary = 'at36-restored-checkpoint-canary';
+const inputKey = 'gen_ai.input.messages';
+const outputKey = 'gen_ai.output.messages';
+const traceDestinations = [
+  'in-browser',
+  'user-device',
+  'user-endpoint',
+  'host-server',
+  'third-party',
+] as const;
+const allowPrivate: DataPolicy = { 'private-user': { allow: traceDestinations } };
+
+function rootMessage(role: 'user' | 'assistant', content: string) {
+  return JSON.stringify([{ role, parts: [{ type: 'text', content }] }]);
+}
+
+async function rootTextScenario({
+  input = ` ${rootInput} `,
+  inputSchema = z
+    .string()
+    .trim()
+    .meta(galaxieField({ label: 'public' })),
+  output = rootOutput,
+  destination,
+  policy,
+  lateLabel,
+  restored = false,
+  restoreDuringDispatch = false,
+  outcome = 'success',
+  children = false,
+  payloadBytes,
+}: {
+  input?: string;
+  inputSchema?: Schema;
+  output?: unknown;
+  destination?: DestinationClass;
+  policy?: DataPolicy;
+  lateLabel?: DataLabel;
+  restored?: boolean;
+  restoreDuringDispatch?: boolean;
+  outcome?: 'success' | 'fail' | 'cancel' | 'pause';
+  children?: boolean;
+  payloadBytes?: number;
+} = {}) {
+  const interaction = {
+    interactionId: 'at36-root-text' as InteractionId,
+    surfaceId: 'main',
+    viewRevision: 'r1' as ViewRevision,
+    component: 'tests.Question/v1' as const,
+    props: { question: pendingCanary },
+  };
+  const pauseDrain = Promise.withResolvers<void>();
+  const credentials: unknown[] = [];
+  const executor = new FakeExecutor([
+    async function* (request): AsyncGenerator<ExecutorEvent> {
+      if (payloadBytes !== undefined) request.payload?.('x'.repeat(payloadBytes - 2));
+      if (children) {
+        const node = request.trace.start({ kind: 'node', name: 'root-text-fixture' });
+        const lease = await request.models.begin('assistant');
+        credentials.push(lease.credential);
+        const model = request.trace.start(
+          {
+            kind: 'model',
+            model: 'root-text-model',
+            input: [{ role: 'user', parts: [{ type: 'text', content: 'child prompt' }] }],
+          },
+          node,
+        );
+        lease.end({ inputTokens: 2, outputTokens: 3 });
+        model.end({
+          status: 'ok',
+          usage: { inputTokens: 2, outputTokens: 3 },
+          output: [{ role: 'assistant', parts: [{ type: 'text', content: 'child reply' }] }],
+        });
+        await request.capabilities.call('lookup@1', { id: 'entry' }, { parent: node });
+        node.end({ status: 'ok' });
+      } else if (lateLabel !== undefined) {
+        await request.capabilities.call('lookup@1', { id: 'entry' });
+      }
+      if (restored) request.registerRestoredData?.({ value: restoredCanary });
+      yield stream(streamCanary);
+      if (outcome === 'pause') {
+        yield { type: 'interaction', interaction };
+        if (restoreDuringDispatch) await pauseDrain.promise;
+      } else if (outcome === 'fail') throw new Error('at36-root-error-canary');
+      else if (outcome === 'cancel' && !request.signal.aborted)
+        await new Promise<void>((resolve) =>
+          request.signal.addEventListener('abort', () => resolve(), { once: true }),
+        );
+      let outputRead = false;
+      yield {
+        type: 'output',
+        get output() {
+          if (outputRead) return 'at36-reread-output-canary';
+          outputRead = true;
+          return output;
+        },
+      };
+      yield { type: 'output', output: 'at36-late-output-canary' };
+    },
+    [{ type: 'output', output }],
+  ]);
+  Object.assign(executor.features, { resume: true });
+  executor.agent.pending = async (_sessionId, options) => {
+    if (restoreDuringDispatch) options?.registerRestoredData?.({ value: restoredCanary });
+    return interaction;
+  };
+  const exporter = new InMemorySpanExporter();
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  const runtime = createRuntime({
+    appId: 'at36-root-text',
+    executors: [executor],
+    tracerProvider: provider,
+    ...(destination === undefined ? {} : { developmentTraceText: { destination } }),
+    ...(policy === undefined ? {} : { dataPolicy: policy }),
+    budgets: { toolCalls: 1, tokens: 5, ...(payloadBytes === undefined ? {} : { payloadBytes }) },
+  });
+  const instance = await runtime.create(
+    {
+      ...fakeDefinition,
+      input: inputSchema,
+      models: assistantRoles,
+      capabilities: {
+        optional: {
+          'lookup@1': {
+            kind: 'read',
+            input: z.object({ id: z.enum(['entry']) }),
+            output: z.string().meta(galaxieField({ label: lateLabel ?? 'public' })),
+          },
+        },
+      },
+    },
+    {
+      agent: {},
+      principalScope: 'fixture',
+      models: {
+        providers: {
+          assistant: {
+            destination: 'host-server',
+            modality: 'text',
+            features: ['streaming', 'cancellation'],
+            pricing: { inputPerToken: 0, outputPerToken: 0 },
+            credential: true,
+          },
+        },
+        roles: { assistant: { providers: ['assistant'], allow: ['host-server'], maxTokens: 5 } },
+        consent: () => true,
+        getCredential: () => leaseCanary,
+      },
+      bindings: {
+        'lookup@1': children
+          ? httpCapability<{ id: 'entry' }, string>({
+              ...binding(),
+              destination: 'host-server',
+              url: 'https://example.test/lookup/{id}',
+              method: 'GET',
+              headers: () => ({ authorization: `Bearer ${bearerCanary}` }),
+              fetch: async (_input, init) => {
+                credentials.push(new Headers(init?.headers).get('authorization'));
+                return Response.json('at36-capability-result-canary');
+              },
+            })
+          : { ...binding(), invoke: async () => 'at36-capability-result-canary' },
+      },
+    },
+  );
+  try {
+    await instance.prepare();
+    const { runId } = await instance.start(input);
+    if (outcome === 'pause') {
+      for await (const event of instance.events(runId)) if (event.type === 'interaction') break;
+      if (!restoreDuringDispatch)
+        await vi.waitFor(() => expect(exporter.getFinishedSpans().some(isRoot)).toBe(true));
+      expect(
+        await instance.dispatch({
+          ...interaction,
+          instanceId: instance.instanceId,
+          runId,
+          action: 'submit',
+          payload: restoreDuringDispatch ? false : inboxCanary,
+        }),
+      ).toMatchObject({ status: 'accepted' });
+      pauseDrain.resolve();
+    }
+    if (outcome === 'cancel') {
+      for await (const event of instance.events(runId)) if (event.type === 'stream') break;
+      await instance.cancel(runId);
+    }
+    const events = (await collect(instance.events(runId))).map(
+      ({ eventId: _eventId, runId: _runId, ...event }) => event,
+    );
+    const status = instance.getSnapshot().run?.status;
+    await runtime.dispose();
+    await provider.forceFlush();
+    const spans = exporter.getFinishedSpans();
+    return { spans, status, events, credentials };
+  } finally {
+    pauseDrain.resolve();
+    await runtime.dispose();
+    await provider.shutdown();
+  }
+}
+
+function isRoot(span: ReturnType<InMemorySpanExporter['getFinishedSpans']>[number]) {
+  return span.attributes['gen_ai.operation.name'] === 'invoke_agent';
+}
+
+function expectRootText(
+  spans: ReturnType<InMemorySpanExporter['getFinishedSpans']>,
+  ...expected: ReadonlyArray<readonly [status: string, input?: string | undefined, output?: string]>
+) {
+  const roots = spans.filter(isRoot);
+  expect(roots).toHaveLength(expected.length);
+  expect(new Set(roots.map((root) => root.spanContext().traceId)).size).toBe(roots.length);
+  for (const [segment, [status, input, output]] of expected.entries()) {
+    const root = roots.find((span) => span.attributes['galaxie.run.segment'] === segment);
+    if (root === undefined) throw new Error(`Missing root span for segment ${segment}.`);
+    expect(root.parentSpanContext).toBeUndefined();
+    assertSpanTree(
+      spans.filter((span) => span.spanContext().traceId === root.spanContext().traceId),
+      { text: 'allowed' },
+    );
+    expect(root.attributes['galaxie.run.status']).toBe(status);
+    expect(root.attributes[inputKey]).toBe(
+      input === undefined ? undefined : rootMessage('user', input),
+    );
+    expect(root.attributes[outputKey]).toBe(
+      output === undefined ? undefined : rootMessage('assistant', output),
+    );
+    expect(root.attributes['gen_ai.tool.call.arguments']).toBeUndefined();
+  }
+}
+
+test('AT-36 root text is opt-in and records only normalized input and the accepted output', async () => {
+  const absent = await rootTextScenario({ children: true, payloadBytes: 128 });
+  const allowed = await rootTextScenario({
+    children: true,
+    payloadBytes: 128,
+    destination: 'third-party',
+    policy: allowPrivate,
+  });
+  expectRootText(absent.spans, ['succeeded']);
+  expectNoText(absent.spans);
+  expectRootText(allowed.spans, ['succeeded', rootInput, rootOutput]);
+  expect(withoutText(allowed.spans)).toEqual(withoutText(absent.spans));
+  expect(
+    allowed.spans.find((span) => span.name === 'chat root-text-model')?.attributes,
+  ).toMatchObject({
+    [inputKey]: rootMessage('user', 'child prompt'),
+    [outputKey]: rootMessage('assistant', 'child reply'),
+    'gen_ai.usage.input_tokens': 2,
+    'gen_ai.usage.output_tokens': 3,
+  });
+  expect(
+    allowed.spans.find((span) => span.name === 'execute_tool lookup@1')?.attributes,
+  ).toMatchObject({ 'gen_ai.tool.call.arguments': '{"id":"entry"}' });
+  expect(allowed.events).toEqual(absent.events);
+  expect(allowed.events.at(-1)).toMatchObject({ type: 'output', output: rootOutput });
+  for (const result of [absent, allowed]) {
+    expect(result.status).toBe('succeeded');
+    expect(result.credentials).toEqual([leaseCanary, `Bearer ${bearerCanary}`]);
+    const serialized = serializeSpans(result.spans);
+    for (const canary of [
+      leaseCanary,
+      bearerCanary,
+      streamCanary,
+      'at36-late-output-canary',
+      'at36-reread-output-canary',
+      'at36-capability-result-canary',
+    ])
+      expect(serialized).not.toContain(canary);
+  }
+  expect(serializeSpans(absent.spans)).not.toContain(rootInput);
+  expect(serializeSpans(allowed.spans)).toContain(rootInput);
+});
+
+test.each(traceDestinations)(
+  'AT-36 root text applies final destination policy for %s',
+  async (destination) => {
+    const otherDestinations = traceDestinations.filter((value) => value !== destination);
+    const allowed = await rootTextScenario({
+      destination,
+      policy: { 'private-user': { allow: [destination, ...otherDestinations.slice(0, 1)] } },
+    });
+    expectRootText(allowed.spans, ['succeeded', rootInput, rootOutput]);
+    const denied = await rootTextScenario({
+      destination,
+      policy: { 'private-user': { allow: otherDestinations } },
+    });
+    expectRootText(denied.spans, ['succeeded', rootInput]);
+    const defaults = await rootTextScenario({ destination });
+    expectRootText(defaults.spans, ['succeeded', rootInput]);
+  },
+);
+
+test.each([
+  { destination: 'third-party', policy: allowPrivate },
+  { destination: 'in-browser', policy: { ...allowPrivate, app: { allow: ['in-browser'] } } },
+] as const)(
+  'AT-36 root text omits text with a late capability label for $destination',
+  async (options) => {
+    const { spans } = await rootTextScenario({ ...options, lateLabel: 'app' });
+    expectRootText(spans, ['succeeded']);
+    expect(spans.find(isRoot)?.attributes['galaxie.run.labels']).toEqual(['app', 'public']);
+    expect(serializeSpans(spans)).not.toContain(rootInput);
+  },
+);
+
+test('AT-36 root text respects labels added by restored data', async () => {
+  const { spans } = await rootTextScenario({ destination: 'third-party', restored: true });
+  expectRootText(spans, ['succeeded']);
+  expect(spans.find(isRoot)?.attributes['galaxie.run.labels']).toEqual(['private-user', 'public']);
+  expect(serializeSpans(spans)).not.toMatch(new RegExp(`${rootInput}|${restoredCanary}`));
+});
+
+test('AT-36 root text accounts for checkpoint inspection while a paused segment drains', async () => {
+  const options = {
+    destination: 'third-party',
+    outcome: 'pause',
+    restoreDuringDispatch: true,
+  } as const;
+  const denied = await rootTextScenario(options);
+  expectRootText(denied.spans, ['waiting_input'], ['succeeded']);
+  expect(denied.spans.filter(isRoot).map((span) => span.attributes['galaxie.run.labels'])).toEqual([
+    ['public'],
+    ['public'],
+  ]);
+  const allowed = await rootTextScenario({ ...options, policy: allowPrivate });
+  expectRootText(allowed.spans, ['waiting_input', rootInput], ['succeeded', undefined, rootOutput]);
+  for (const spans of [allowed.spans, denied.spans])
+    expect(serializeSpans(spans)).not.toContain(restoredCanary);
+});
+
+test('AT-36 root text treats unlabelled start strings as private without changing run labels', async () => {
+  const options = {
+    destination: 'host-server',
+    inputSchema: z.string(),
+    input: rootInput,
+  } as const;
+  const defaults = await rootTextScenario(options);
+  expectRootText(defaults.spans, ['succeeded']);
+  expect(defaults.spans.find(isRoot)?.attributes['galaxie.run.labels']).toEqual(['app']);
+  expect(serializeSpans(defaults.spans)).not.toContain(rootInput);
+  const allowed = await rootTextScenario({ ...options, policy: allowPrivate });
+  expectRootText(allowed.spans, ['succeeded', rootInput, rootOutput]);
+  const labelled = await rootTextScenario({
+    ...options,
+    inputSchema: z.union([z.string().meta(galaxieField({ label: 'app' })), z.number()]),
+  });
+  expectRootText(labelled.spans, ['succeeded', rootInput]);
+  const impossibleBranch = await rootTextScenario({
+    ...options,
+    inputSchema: z.union([z.string().meta(galaxieField({ label: 'app' })), z.never()]),
+  });
+  expectRootText(impossibleBranch.spans, ['succeeded', rootInput]);
+  const mixed = await rootTextScenario({
+    ...options,
+    inputSchema: z.union([
+      z.string(),
+      z.object({ value: z.string().meta(galaxieField({ label: 'app' })) }),
+    ]),
+  });
+  expectRootText(mixed.spans, ['succeeded']);
+  const ambiguous = await rootTextScenario({
+    ...options,
+    inputSchema: z.union([z.string().meta(galaxieField({ label: 'app' })), z.string()]),
+  });
+  expectRootText(ambiguous.spans, ['succeeded']);
+  const patterned = await rootTextScenario({
+    ...options,
+    inputSchema: z.union([
+      z.string().startsWith('at36-').meta(galaxieField({ label: 'app' })),
+      z.string().startsWith('alternate-'),
+    ]),
+  });
+  expectRootText(patterned.spans, ['succeeded']);
+});
+
+test.each(['fail', 'cancel'] as const)(
+  'AT-36 root text omits both attributes on %s',
+  async (outcome) => {
+    const { spans, events } = await rootTextScenario({
+      destination: 'third-party',
+      policy: allowPrivate,
+      outcome,
+    });
+    expectRootText(spans, [outcome === 'fail' ? 'failed' : 'cancelled']);
+    expect(events.at(-1)?.type).toBe(outcome === 'fail' ? 'error' : 'cancelled');
+    expect(serializeSpans(spans)).not.toMatch(
+      /at36-root-error-canary|at36-late-output-canary|at36-user-typed-canary/,
+    );
+  },
+);
+
+test('AT-36 root text records the initial input on pause and only the final reply on resume', async () => {
+  const options = { destination: 'third-party', outcome: 'pause' } as const;
+  const allowed = await rootTextScenario({ ...options, policy: allowPrivate });
+  expectRootText(allowed.spans, ['waiting_input', rootInput], ['succeeded', undefined, rootOutput]);
+  expect(allowed.events.at(-1)).toMatchObject({ type: 'output', output: rootOutput });
+  const defaults = await rootTextScenario(options);
+  expectRootText(defaults.spans, ['waiting_input', rootInput], ['succeeded']);
+  for (const spans of [allowed.spans, defaults.spans])
+    expect(serializeSpans(spans)).not.toMatch(new RegExp(`${pendingCanary}|${inboxCanary}`));
+});
+
+test('AT-36 root text omits structured invocations and empty strings', async () => {
+  const structured = await completeSpanTree(false, true, allowPrivate);
+  expect(structured.events.at(-1)).toMatchObject({
+    type: 'output',
+    output: { value: 'public input' },
+  });
+  expectRootText(structured.spans, ['succeeded']);
+  const empty = await rootTextScenario({
+    destination: 'third-party',
+    policy: allowPrivate,
+    input: ' ',
+    output: '',
+  });
+  expectRootText(empty.spans, ['succeeded']);
+});
+
+test.each([
+  { payloadBytes: 128, limit: 128 },
+  { payloadBytes: 32 * 1024, limit: 16 * 1024 },
+])(
+  'AT-36 root text bounds each encoded attribute at $limit UTF-8 bytes',
+  async ({ payloadBytes, limit }) => {
+    const escaped = '😀\n"\\\0\ud800';
+    const utf8 = new TextEncoder();
+    const atLimit = (role: 'user' | 'assistant'): string =>
+      escaped + 'x'.repeat(limit - utf8.encode(rootMessage(role, escaped)).byteLength);
+    const input = atLimit('user');
+    const output = atLimit('assistant');
+    expect(utf8.encode(rootMessage('user', input))).toHaveLength(limit);
+    expect(utf8.encode(rootMessage('assistant', output))).toHaveLength(limit);
+    const options = { destination: 'third-party', policy: allowPrivate, payloadBytes } as const;
+    const exact = await rootTextScenario({ ...options, input, output });
+    expectRootText(exact.spans, ['succeeded', input, output]);
+    const bigInput = await rootTextScenario({ ...options, input: `${input}x`, output });
+    expectRootText(bigInput.spans, ['succeeded', undefined, output]);
+    const bigOutput = await rootTextScenario({ ...options, input, output: `${output}x` });
+    expectRootText(bigOutput.spans, ['succeeded', input]);
+    expect(bigOutput.events.at(-1)).toMatchObject({ type: 'output', output: `${output}x` });
+  },
+);
+
+test('AT-36 root text bounds candidates before encoding and omits serialization failures', async () => {
+  const oversized = 'x'.repeat(129);
+  const output = 'at36-serialization-failure';
+  const attempted: string[] = [];
+  const stringify = JSON.stringify;
+  const encoder = vi.spyOn(JSON, 'stringify').mockImplementation((value, ...args) => {
+    const content: unknown = Array.isArray(value) ? value[0]?.parts?.[0]?.content : undefined;
+    if (content === oversized || content === output) {
+      attempted.push(content);
+      throw new TypeError('Root text cannot be serialized.');
+    }
+    return Reflect.apply(stringify, JSON, [value, ...args]);
+  });
+  const { spans, events } = await rootTextScenario({
+    destination: 'third-party',
+    policy: allowPrivate,
+    input: oversized,
+    output,
+    payloadBytes: 128,
+  }).finally(() => encoder.mockRestore());
+  expect(attempted).toEqual([output]);
+  expectRootText(spans, ['succeeded']);
+  expect(events.at(-1)).toMatchObject({ type: 'output', output });
 });

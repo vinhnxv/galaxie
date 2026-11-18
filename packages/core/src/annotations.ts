@@ -120,6 +120,13 @@ export interface Annotations {
 
 /** Reads Standard JSON Schema in both directions, without importing the schema library. */
 export function readAnnotations(schema: StandardSchema): Annotations {
+  return compileAnnotations(schema).annotations;
+}
+
+export function compileAnnotations(schema: StandardSchema): {
+  readonly annotations: Annotations;
+  unlabelledString(value: string): boolean;
+} {
   const standard = schema['~standard'] as unknown as {
     jsonSchema?: {
       input(options: unknown): unknown;
@@ -258,9 +265,48 @@ export function readAnnotations(schema: StandardSchema): Annotations {
     return [...result];
   };
   return {
-    labels,
-    properties,
-    privateStrings: (value) => [...new Set(roots.flatMap((root) => match(value, root, 'private')))],
-    freeTextStrings: (value) => match(value, outputRoot, 'free'),
+    annotations: {
+      labels,
+      properties,
+      privateStrings: (value) => [
+        ...new Set(roots.flatMap((root) => match(value, root, 'private'))),
+      ],
+      freeTextStrings: (value) => match(value, outputRoot, 'free'),
+    },
+    unlabelledString(value): boolean {
+      const visited = new Map<Node, boolean>();
+      const walk = (raw: unknown): boolean => {
+        if (raw === false) return false;
+        const original = node(raw);
+        const current = resolve(raw, outputRoot);
+        if (labelsAt(current, labelsAt(original, new Set())).size !== 0) return false;
+        const type = current['type'];
+        if (type !== undefined && type !== 'string' && !children(type).includes('string'))
+          return false;
+        const exclusion = current['not'];
+        if (
+          exclusion === true ||
+          (exclusion === node(exclusion) && Object.keys(exclusion).length === 0)
+        )
+          return false;
+        if (Object.hasOwn(current, 'const') && current['const'] !== value) return false;
+        if (Array.isArray(current['enum']) && !current['enum'].includes(value)) return false;
+        const known = visited.get(current);
+        if (known !== undefined) return known;
+        visited.set(current, true);
+        const unlabelled =
+          children(current['allOf']).every(walk) &&
+          ['anyOf', 'oneOf'].every(
+            (key) => current[key] === undefined || children(current[key]).some(walk),
+          );
+        visited.set(current, unlabelled);
+        return unlabelled;
+      };
+      try {
+        return walk(outputRoot);
+      } catch {
+        return true;
+      }
+    },
   };
 }
