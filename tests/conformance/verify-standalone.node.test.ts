@@ -349,6 +349,8 @@ it('parses the documented CLI forms and refuses malformed or unknown arguments',
       '--clean-path',
       '--budget-minutes',
       '1',
+      '--server-budget-minutes',
+      '3',
     ]),
   ).toMatchObject({
     nodes: [{ major: 22, path: '/p' }, { major: 24 }],
@@ -357,8 +359,13 @@ it('parses the documented CLI forms and refuses malformed or unknown arguments',
     keep: true,
     cleanPath: true,
     budgetMinutes: 1,
+    serverBudgetMinutes: 3,
   });
-  expect(parseArguments([])).toMatchObject({ cleanPath: false, budgetMinutes: 10 });
+  expect(parseArguments([])).toMatchObject({
+    cleanPath: false,
+    budgetMinutes: 10,
+    serverBudgetMinutes: 2,
+  });
   expect(parseArguments(['--help']).help).toBe(true);
   for (const args of [
     ['--wat'],
@@ -369,6 +376,8 @@ it('parses the documented CLI forms and refuses malformed or unknown arguments',
     ['--mode', 'missing'],
     ['--budget-minutes'],
     ...['0', '61', 'x', '1.5', '-1', 'Infinity'].map((value) => ['--budget-minutes', value]),
+    ['--server-budget-minutes'],
+    ...['0', '61', 'x', '1.5', '-1', 'Infinity'].map((value) => ['--server-budget-minutes', value]),
   ])
     expect(() => parseArguments(args)).toThrow('Usage');
   expect(templateSpecs.map(({ name, kind, framework }) => ({ name, kind, framework }))).toEqual([
@@ -402,6 +411,7 @@ it('renders every phase and source and preserves the JSON result shape', () => {
     exclude: null,
     browser: null,
     durationMs: 1234,
+    serverDurationMs: null,
     failures: [
       {
         phase: 'build' as const,
@@ -592,6 +602,7 @@ it.each(['within', 'exact', 'over', 'failed'] as const)(
       for (const result of results) {
         expect(result.durationMs).toBe(elapsed);
         expect(JSON.parse(JSON.stringify(result)).durationMs).toBe(elapsed);
+        expect(result.serverDurationMs).toBeNull();
         if (kind === 'within' || kind === 'exact') expect(result.failures).toEqual([]);
         else
           expect(result.failures.filter(({ phase }) => phase === 'budget')).toEqual([
@@ -625,9 +636,116 @@ it.each(['within', 'exact', 'over', 'failed'] as const)(
   },
 );
 
-it.each(['go', 'python', 'python3', 'uv'])(
+it.each([
+  { kind: 'within', elapsed: 59_999, limit: 1 },
+  { kind: 'exact', elapsed: 60_000, limit: 1 },
+  { kind: 'over', elapsed: 60_001, limit: 1 },
+  { kind: 'compile failure', elapsed: 40_000, limit: 1 },
+  { kind: 'drive failure', elapsed: 60_001, limit: 1 },
+  { kind: 'default exact', elapsed: 120_000 },
+  { kind: 'default over', elapsed: 120_001 },
+])('measures and gates the compiled gateway leg independently ($kind)', async (fixture) => {
+  const root = await temporary();
+  const repo = join(root, 'repo');
+  await mkdir(repo);
+  await writeFile(join(repo, 'pnpm-workspace.yaml'), 'minimumReleaseAge: 10080');
+  const server = createServer((_request, response) => response.end('ready'));
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  if (address === null || typeof address === 'string') throw new Error('No fixture port.');
+  let elapsed = 0;
+  const drive = vi.fn(async (_url: string, spec: TemplateSpec) => {
+    if (spec.steps[0]?.name === 'compiled') {
+      elapsed += fixture.elapsed - 50_000;
+      if (fixture.kind === 'drive failure') throw new Error('drive-canary');
+    } else elapsed += 1_000;
+    return 'fixture-browser';
+  });
+  try {
+    const results = await runStandalone(
+      {
+        repo,
+        tempBase: root,
+        nodes: [{ major: Number(process.versions.node.split('.')[0]) }],
+        modes: ['registry'],
+        specs: [
+          {
+            ...fixtureSpec,
+            kind: 'gateway',
+            server: {
+              compile: ['compile.cjs'],
+              entry: 'server.cjs',
+              port: address.port,
+              steps: [{ action: 'text', name: 'compiled' }],
+            },
+          },
+        ],
+        ...(fixture.limit === undefined ? {} : { serverBudgetMinutes: fixture.limit }),
+        verifyReleaseAge: false,
+      },
+      {
+        clock: { now: () => elapsed, sleep: async () => {} },
+        scaffold: async ({ directory }) => {
+          await mkdir(directory);
+          await writeFile(join(directory, 'package.json'), '{}');
+          await writeBaseline(directory);
+        },
+        runner: {
+          run: async ({ args, cwd }) => {
+            if (args[0] === '--version') return process.version;
+            if (args.includes('--version')) return '12.2.2';
+            if (args.includes('check')) {
+              const source = await readFile(join(cwd, 'src/csp.ts'), 'utf8');
+              if (source.includes('unsafe-inline')) throw new Error('script-src changed');
+              if (source !== fixtureCsp) throw new Error('require-trusted-types-for changed');
+            }
+            if (args[0] === 'compile.cjs') {
+              elapsed += 40_000;
+              if (fixture.kind === 'compile failure') throw new Error('compile-canary');
+            }
+            return '';
+          },
+          start: async () => ({
+            stop: async () => {
+              elapsed += 5_000;
+            },
+            output: () => '',
+          }),
+        },
+        ports: {
+          find: async (preferred) => {
+            if (preferred !== undefined) elapsed += 10_000;
+            return address.port;
+          },
+        },
+        driver: { drive },
+      },
+    );
+    const allowed = (fixture.limit ?? 2) * 60_000;
+    const budget = `server budget exceeded: ${fixture.elapsed} ms of ${allowed} ms`;
+    const phases = [];
+    if (fixture.kind === 'compile failure') phases.push('compile');
+    if (fixture.kind === 'drive failure') phases.push('drive');
+    if (fixture.elapsed > allowed) phases.push('budget');
+    expect(results[0]).toMatchObject({ durationMs: 1_000, serverDurationMs: fixture.elapsed });
+    expect(results[0]?.failures.map(({ phase }) => phase)).toEqual(phases);
+    expect(drive).toHaveBeenCalledTimes(fixture.kind === 'compile failure' ? 1 : 2);
+    const rendered = renderResults(results);
+    expect(rendered).toContain(`server ${fixture.elapsed} ms`);
+    if (fixture.elapsed > allowed) {
+      expect(results[0]?.failures.at(-1)).toMatchObject({ gating: true, summary: budget });
+      expect(rendered).toContain(budget);
+    }
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+it.each(['go', 'python', 'python3', 'uv', 'non-executable-go'] as const)(
   'requires runtime ENOENT before scaffolding (%s)',
-  async (name) => {
+  async (kind) => {
+    const name = kind === 'non-executable-go' ? 'go' : kind;
     const root = await temporary();
     const repo = join(root, 'repo');
     await mkdir(repo);
@@ -647,11 +765,16 @@ it.each(['go', 'python', 'python3', 'uv'])(
         driver: { drive: async () => 'stub' },
         runner: {
           run: async (command) => {
+            const tool = join(command.env['PATH'] ?? '', name);
             if (command.args[0] === '-e') {
-              await symlink(process.execPath, join(command.env['PATH'] ?? '', name));
+              if (kind !== 'non-executable-go') await symlink(process.execPath, tool);
               return processRunner([process.execPath]).run(command);
             }
             if (command.args[0] === '--version') return process.version;
+            if (kind === 'non-executable-go') {
+              // Plant it before the static PATH scan, which ignores non-executable files.
+              await writeFile(tool, '#!/bin/sh\n', { mode: 0o644 });
+            }
             return '12.2.2';
           },
           start: async () => {
@@ -667,7 +790,9 @@ it.each(['go', 'python', 'python3', 'uv'])(
         {
           phase: 'probe',
           gating: true,
-          excerpt: expect.stringContaining(`Clean PATH violated: ${name}`),
+          excerpt: expect.stringContaining(
+            `Clean PATH violated: ${name} did not fail with ENOENT.`,
+          ),
         },
       ],
     });
@@ -912,16 +1037,16 @@ it.each(['old-npm', 'ignored-policy', 'effective-policy'] as const)(
 );
 
 it.each([
-  'pass',
-  'probe',
-  'probe-short',
-  'external',
-  'pageerror',
-  'console',
-  'probe-twice',
-] as const)(
-  'drives real Chromium offline and detects forbidden behavior (%s)',
-  async (kind) => {
+  ...(['pass', 'external', 'pageerror', 'console', 'probe-twice'] as const).map((kind) => ({
+    framework: fixtureSpec.framework,
+    kind,
+  })),
+  ...['langgraph-js', 'adk-js', 'adk-go', 'langgraph-python'].flatMap((framework) =>
+    (['probe', 'probe-short'] as const).map((kind) => ({ framework, kind })),
+  ),
+])(
+  'drives real Chromium offline and detects forbidden behavior ($framework, $kind)',
+  async ({ framework, kind }) => {
     const server = createServer((_request, response) => {
       response.setHeader('content-type', 'text/html');
       const bad = {
@@ -945,6 +1070,7 @@ it.each([
     try {
       const drive = driveChromium(`http://127.0.0.1:${address.port}`, {
         ...fixtureSpec,
+        framework,
         build: [],
         preview: [],
         steps: [
@@ -953,8 +1079,17 @@ it.each([
           { action: 'text', name: 'Finished' },
         ],
       });
-      if (kind === 'pass' || kind === 'probe' || kind === 'probe-short')
-        expect(await drive).toMatch(/\d+\./);
+      if (kind === 'pass') expect(await drive).toMatch(/\d+\./);
+      else if (kind === 'probe' || kind === 'probe-short')
+        await expect(drive).rejects.toThrow(
+          'Trusted Types probe: configure zod jitless before the application schemas.',
+        );
+      else if (kind === 'probe-twice')
+        await expect(drive).rejects.toThrow(
+          'Trusted Types probe: configure zod jitless before the application schemas.',
+        );
+      else if (kind === 'external')
+        await expect(drive).rejects.toThrow('Cross-origin request attempts: 1.');
       else await expect(drive).rejects.toThrow(/Cross-origin|Page error|Console error/);
     } finally {
       server.closeAllConnections();
@@ -975,13 +1110,15 @@ it.each([
   'correlates the unavailable diagnostic with the response and deliberate step (%s)',
   async (kind) => {
     const path = '/api/v1/chat/completions';
+    let requests = 0;
     const server = createServer((request, response) => {
       if (request.url !== '/') {
+        requests++;
         if (kind === 'failed-request') {
           request.socket.destroy();
           return;
         }
-        response.writeHead(kind === '500' ? 500 : 503);
+        response.writeHead(kind === '500' ? (requests === 1 ? 500 : 200) : 503);
         response.end('unavailable');
         return;
       }
@@ -990,7 +1127,8 @@ it.each([
         kind === 'uncorrelated'
           ? "console.error('Failed to load resource: the server responded with a status of 503 (Service Unavailable)');"
           : '';
-      const action = `document.querySelector('p').textContent='Waiting'; fetch('${kind === 'other-path' ? '/other' : path}').catch(()=>{}).finally(()=>{${diagnostic}document.querySelector('p').textContent='Unavailable'})`;
+      const target = kind === 'other-path' ? '/private/Users/fixture-home/path-canary' : path;
+      const action = `document.querySelector('p').textContent='Waiting'; fetch('${target}?token=fixture-query-canary',{method:'POST'}).catch(()=>{}).finally(()=>{${diagnostic}document.querySelector('p').textContent='Unavailable'})`;
       response.end(
         `<button onclick="${action}">Submit answers</button><p>Waiting</p>${kind === 'outside-step' ? `<script>${action}</script>` : ''}`,
       );
@@ -1016,10 +1154,20 @@ it.each([
       if (kind === 'expected') expect(await drive).toMatch(/\d+\./);
       else if (kind === 'uncorrelated')
         await expect(drive).rejects.toThrow('Console error: uncorrelated HTTP status 503.');
-      else if (kind === '500') await expect(drive).rejects.toThrow('HTTP status 500.');
-      else if (kind === 'outside-step' || kind === 'other-path')
-        await expect(drive).rejects.toThrow('HTTP status 503.');
-      else if (kind === 'failed-request') await expect(drive).rejects.toThrow('Request failed.');
+      else if (kind === '500' || kind === 'failed-request') {
+        const diagnostic = await drive.catch((error: unknown) => String(error));
+        const outcome = kind === '500' ? 'HTTP status 500' : 'net::ERR_EMPTY_RESPONSE';
+        expect(diagnostic).toContain(`Drive step 1 (click): ${path} — ${outcome}`);
+        expect(diagnostic).toMatch(/\(\d+ ms\)/);
+        expect(diagnostic).not.toContain('fixture-query-canary');
+        expect(diagnostic).not.toContain('127.0.0.1');
+        if (kind === '500') expect(requests).toBe(1);
+      } else if (kind === 'other-path') {
+        const diagnostic = await drive.catch((error: unknown) => String(error));
+        expect(diagnostic).toContain('Drive step 1 (click): <path redacted> — HTTP status 503');
+        expect(diagnostic).not.toContain('fixture-home');
+        expect(diagnostic).not.toContain('path-canary');
+      } else if (kind === 'outside-step') await expect(drive).rejects.toThrow('HTTP status 503');
       else await expect(drive).rejects.toThrow(/Console error|HTTP status|Request failed/);
     } finally {
       server.closeAllConnections();
@@ -1027,6 +1175,84 @@ it.each([
     }
   },
   30000,
+);
+
+it('reports a failed request with its elapsed time and the step that sent it', async () => {
+  const path = '/api/v1/chat/completions';
+  const server = createServer((request, response) => {
+    if (request.url === path) {
+      setTimeout(() => {
+        response.writeHead(500);
+        response.end();
+      }, 300);
+      return;
+    }
+    response.setHeader('content-type', 'text/html');
+    response.end(
+      `<button onclick="fetch('${path}',{method:'POST'}).catch(()=>{});setTimeout(()=>{document.querySelector('p').textContent='Later'},700)">Submit answers</button><p>Waiting</p>`,
+    );
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  if (address === null || typeof address === 'string') throw new Error('No port');
+  try {
+    const diagnostic = await driveChromium(`http://127.0.0.1:${address.port}`, {
+      ...fixtureSpec,
+      build: [],
+      preview: [],
+      steps: [
+        { action: 'click', role: 'button', name: 'Submit answers' },
+        { action: 'text', name: 'Later' },
+      ],
+    }).catch((error: unknown) => String(error));
+    // The response arrives while step 2 waits, but the request belongs to step 1.
+    const match =
+      /Drive step 1 \(click\): \/api\/v1\/chat\/completions — HTTP status 500 \((\d+) ms\)/.exec(
+        diagnostic,
+      );
+    expect(match, diagnostic).not.toBeNull();
+    expect(Number(match?.[1])).toBeGreaterThanOrEqual(250);
+    expect(Number(match?.[1])).toBeLessThan(5000);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+}, 30000);
+
+it.each(['refused', '500'] as const)(
+  'reports the initial Chromium navigation failure without retrying (%s)',
+  async (kind) => {
+    let requests = 0;
+    const server = createServer((request, response) => {
+      if (!request.url?.startsWith('/?')) {
+        response.writeHead(204).end();
+        return;
+      }
+      response.writeHead(++requests === 1 ? 500 : 200);
+      response.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (address === null || typeof address === 'string') throw new Error('No port');
+    const close = (): Promise<void> => new Promise((resolve) => server.close(() => resolve()));
+    if (kind === 'refused') await close();
+    try {
+      const diagnostic = await driveChromium(
+        `http://127.0.0.1:${address.port}/?token=fixture-navigation-canary`,
+        fixtureSpec,
+      ).catch((error: unknown) => String(error));
+      const outcome = kind === 'refused' ? 'net::ERR_CONNECTION_REFUSED' : 'HTTP status 500';
+      expect(diagnostic).toContain(`Drive navigation: / — ${outcome}`);
+      expect(diagnostic).toMatch(/\(\d+ ms\)/);
+      expect(diagnostic).not.toContain('fixture-navigation-canary');
+      expect(diagnostic).not.toContain('127.0.0.1');
+      // A refused connection never reaches the server, so only the 500 case proves one request.
+      if (kind === '500') expect(requests).toBe(1);
+      expect(diagnostic).not.toContain('Drive step');
+    } finally {
+      if (server.listening) await close();
+    }
+  },
 );
 
 it('keeps a refused binary associated with the requested Node major', async () => {

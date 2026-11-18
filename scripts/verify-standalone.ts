@@ -4,6 +4,7 @@
 import { writeFile } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Request } from 'playwright';
 import type { Mode, NodeRequest, Result, Step, TemplateSpec } from './standalone-core.js';
 
 export interface Arguments {
@@ -17,6 +18,7 @@ export interface Arguments {
   keep: boolean;
   cleanPath: boolean;
   budgetMinutes: number;
+  serverBudgetMinutes: number;
   help: boolean;
 }
 export const usage = `Usage: node scripts/verify-standalone.ts [options]
@@ -30,7 +32,8 @@ export const usage = `Usage: node scripts/verify-standalone.ts [options]
   --min-release-age-exclude <pattern>       explicit, recorded npm exclusion
   --keep                                  retain and print the temporary root
   --clean-path                            project PATH contains only node and sh
-  --budget-minutes <n>                     per-project budget, integer 1 to 60 (default 10)
+  --budget-minutes <n>                     scaffold through preview, integer 1 to 60 (default 10)
+  --server-budget-minutes <n>              gateway compile and drive, integer 1 to 60 (default 2)
   --help
 Node versions are never downloaded. Missing Node 22: nvm install 22.
 Packing needs pnpm on PATH and this workspace's installed build tooling.
@@ -45,6 +48,7 @@ export function parseArguments(args: readonly string[]): Arguments {
     keep: false,
     cleanPath: false,
     budgetMinutes: 10,
+    serverBudgetMinutes: 2,
     help: false,
   };
   const invalid: () => never = () => {
@@ -102,11 +106,13 @@ export function parseArguments(args: readonly string[]): Arguments {
       case '--min-release-age-exclude':
         options.exclude = value;
         break;
-      case '--budget-minutes': {
+      case '--budget-minutes':
+      case '--server-budget-minutes': {
         const minutes = Number(value);
         if (!/^\d+$/.test(value) || !Number.isInteger(minutes) || minutes < 1 || minutes > 60)
           invalid();
-        options.budgetMinutes = minutes;
+        if (flag === '--budget-minutes') options.budgetMinutes = minutes;
+        else options.serverBudgetMinutes = minutes;
         break;
       }
       default:
@@ -196,6 +202,22 @@ export const templateSpecs: readonly TemplateSpec[] = [
   ),
 ];
 
+function redactRequestPath(url: string): string {
+  const { pathname } = new URL(url);
+  if (
+    pathname === '/' ||
+    pathname === '/favicon.ico' ||
+    pathname === '/api/session' ||
+    pathname === '/api/v1/chat/completions' ||
+    pathname === '/go/agent.wasm' ||
+    pathname === '/python/runtime/pyodide.asm.wasm'
+  )
+    return pathname;
+  for (const prefix of ['/assets/', '/python/runtime/', '/python/wheels/', '/python/agent/'])
+    if (pathname.startsWith(prefix)) return `${prefix}<file>`;
+  return '<path redacted>';
+}
+
 export async function driveChromium(
   url: string,
   spec: TemplateSpec,
@@ -219,90 +241,125 @@ export async function driveChromium(
   signal?.addEventListener('abort', abort, { once: true });
   try {
     signal?.throwIfAborted();
+    const origin = URL.parse(url)?.origin;
     const context = await browser.newContext({ serviceWorkers: 'block' });
     await context.addInitScript(
       "Object.defineProperty(globalThis, 'LanguageModel', { configurable: true, value: undefined }); Object.defineProperty(navigator, 'gpu', { configurable: true, value: undefined });",
     );
     let external = 0;
     const errors: string[] = [];
-    let probes = 0;
+    const requestErrors: string[] = [];
+    const addError = (message: string): void => {
+      if (errors.length < 16) errors.push(message);
+    };
+    let activity = 'navigation';
+    const requests = new WeakMap<Request, { step: string; start: number }>();
+    const requestError = (request: Request, reason: string): void => {
+      if (requestErrors.length >= 16) return;
+      const now = performance.now();
+      const { step, start } = requests.get(request) ?? { step: activity, start: now };
+      requestErrors.push(
+        `Drive ${step}: ${redactRequestPath(request.url())} — ${reason} (${Math.round(now - start)} ms)`,
+      );
+    };
     let expected: Step['unavailable'];
     const responses = new Set<string>();
-    const diagnostics: string[] = [];
+    const diagnostics = new Set<string>();
     const flush = async (): Promise<void> => {
       await page.evaluate(
         'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))',
       );
     };
     await context.route('**/*', async (route) => {
-      if (new URL(route.request().url()).origin !== new URL(url).origin) {
+      if (new URL(route.request().url()).origin !== origin) {
         external++;
         await route.abort('blockedbyclient');
       } else await route.continue();
     });
     const page = await context.newPage();
     page.setDefaultTimeout(15000);
-    page.on('pageerror', () => errors.push('Page error.'));
-    page.on('requestfailed', () => errors.push('Request failed.'));
+    page.on('pageerror', () => addError('Page error.'));
+    page.on('request', (request) => {
+      requests.set(request, { step: activity, start: performance.now() });
+    });
+    page.on('requestfailed', (request) => {
+      const code = request.failure()?.errorText ?? '';
+      requestError(request, /^net::ERR_[A-Z0-9_]{1,48}$/.test(code) ? code : 'Request failed');
+    });
     page.on('response', (response) => {
-      if (response.status() < 400) return;
-      const target = new URL(response.url());
-      if (
-        expected !== undefined &&
-        response.status() === 503 &&
-        target.origin === new URL(url).origin &&
-        target.pathname === expected.path
-      )
-        responses.add(response.url());
-      else errors.push(`HTTP status ${response.status()}.`);
+      const status = response.status();
+      if (status < 400) return;
+      if (expected !== undefined && status === 503) {
+        const target = new URL(response.url());
+        if (target.origin === origin && target.pathname === expected.path) {
+          responses.add(response.url());
+          return;
+        }
+      }
+      requestError(response.request(), `HTTP status ${status}`);
     });
     page.on('console', (message) => {
       if (message.type() !== 'error') return;
-      if (
-        (message.text() === "This document requires 'TrustedScript' assignment." ||
-          message.text() ===
-            "This document requires 'TrustedScript' assignment. The action has been blocked.") &&
-        probes++ === 0
-      )
-        return;
       if (
         expected !== undefined &&
         /^Failed to load resource: the server responded with a status of 503(?: \(Service Unavailable\))?$/.test(
           message.text(),
         )
       ) {
-        diagnostics.push(message.location().url);
+        diagnostics.add(message.location().url);
         return;
       }
-      errors.push('Console error.');
+      // Fixed text: the page's message is not echoed, and the cause is named for the operator.
+      addError(
+        message.text().startsWith("This document requires 'TrustedScript' assignment.")
+          ? 'Trusted Types probe: configure zod jitless before the application schemas.'
+          : 'Console error.',
+      );
     });
-    const response = await page.goto(url);
-    if (response?.status() !== 200) throw new Error('Page did not return 200.');
-    for (const step of spec.steps) {
-      expected = step.unavailable;
-      if (step.action === 'text') await page.getByText(step.name, { exact: true }).waitFor();
-      else {
-        if (step.role === undefined) throw new Error('Missing step role.');
-        const locator = page.getByRole(step.role, { name: step.name, exact: true });
-        if (step.action === 'check') await locator.check();
-        else if (step.action === 'click') await locator.click();
-        else await locator.waitFor();
+    try {
+      const response = await page.goto(url);
+      const navigated = response?.status() === 200;
+      if (!navigated) {
+        if (response !== null && response.status() < 400)
+          requestError(response.request(), `HTTP status ${response.status()}`);
+        addError('Page did not return 200.');
       }
-      if (expected !== undefined) {
-        await page.getByText(expected.text, { exact: true }).waitFor();
-        await flush();
-        if (responses.size === 0) errors.push('Expected HTTP status 503 was not observed.');
-        for (const diagnostic of diagnostics)
-          if (!responses.has(diagnostic))
-            errors.push('Console error: uncorrelated HTTP status 503.');
-        responses.clear();
-        diagnostics.length = 0;
+      const steps = navigated ? spec.steps : [];
+      for (const [index, step] of steps.entries()) {
+        activity = `step ${index + 1} (${step.action})`;
+        expected = step.unavailable;
+        if (step.action === 'text') await page.getByText(step.name, { exact: true }).waitFor();
+        else {
+          if (step.role === undefined) {
+            addError('Missing step role.');
+            break;
+          }
+          const locator = page.getByRole(step.role, { name: step.name, exact: true });
+          if (step.action === 'check') await locator.check();
+          else if (step.action === 'click') await locator.click();
+          else await locator.waitFor();
+        }
+        if (expected !== undefined) {
+          await page.getByText(expected.text, { exact: true }).waitFor();
+          await flush();
+          if (responses.size === 0) addError('Expected HTTP status 503 was not observed.');
+          for (const diagnostic of diagnostics)
+            if (!responses.has(diagnostic))
+              addError('Console error: uncorrelated HTTP status 503.');
+          responses.clear();
+          diagnostics.clear();
+        }
+        expected = undefined;
       }
-      expected = undefined;
+      await flush();
+    } catch {
+      // Playwright errors can include complete URLs, selectors or page content.
+      signal?.throwIfAborted();
+      addError(`Drive ${activity} failed.`);
     }
-    await flush();
-    if (external > 0) throw new Error(`Cross-origin request attempts: ${external}.`);
-    if (errors.length > 0) throw new Error(errors.join('\n'));
+    if (external > 0) requestErrors.unshift(`Cross-origin request attempts: ${external}.`);
+    if (requestErrors.length > 0 || errors.length > 0)
+      throw new Error([...requestErrors, ...errors].join('\n'));
     return browser.version();
   } finally {
     signal?.removeEventListener('abort', abort);
@@ -314,7 +371,7 @@ export function renderResults(results: readonly Result[]): string {
   return results
     .map(
       (result) =>
-        `${result.template} | ${result.node} | npm ${result.npm} | ${result.mode} | ${result.failures.some((failure) => failure.gating || failure.source === 'unclassified') ? 'FAIL' : 'PASS'} | ${result.durationMs} ms | release age ${result.releaseAgeDays}d${result.exclude === null ? '' : `; exclusion ${result.exclude}`}\n${result.failures.map((failure) => `  ${failure.phase} [${failure.source}]${failure.gating ? '' : ' (advisory)'}: ${failure.summary}\n${failure.excerpt}`).join('\n')}`,
+        `${result.template} | ${result.node} | npm ${result.npm} | ${result.mode} | ${result.failures.some((failure) => failure.gating || failure.source === 'unclassified') ? 'FAIL' : 'PASS'} | ${result.durationMs} ms${result.serverDurationMs === null ? '' : ` | server ${result.serverDurationMs} ms`} | release age ${result.releaseAgeDays}d${result.exclude === null ? '' : `; exclusion ${result.exclude}`}\n${result.failures.map((failure) => `  ${failure.phase} [${failure.source}]${failure.gating ? '' : ' (advisory)'}: ${failure.summary}\n${failure.excerpt}`).join('\n')}`,
     )
     .join('\n');
 }
@@ -349,6 +406,7 @@ if (import.meta.main) {
           keep: options.keep,
           cleanPath: options.cleanPath,
           budgetMinutes: options.budgetMinutes,
+          serverBudgetMinutes: options.serverBudgetMinutes,
         },
         {
           scaffold: async ({ spec, directory, tarballs, node, env, signal, runner }) => {

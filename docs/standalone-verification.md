@@ -10,6 +10,13 @@ production server still follows the correlated 503 unavailable flow. These check
 use no Built-in AI, WebGPU or upstream model. Earlier records below predate the
 gateway mock.
 
+The Chromium drive allows zero Trusted Types probe errors for each framework
+(`langgraph-js`, `adk-js`, `adk-go` and `langgraph-python`). Both JavaScript
+starters configure Zod before creating the application's schemas. The Go and
+Python framework layers configure Zod during bundling, and the starter browser
+tests require zero policy violations and zero errors on their successful mock
+drives.
+
 ## Release preparation (2026-11-17)
 
 All thirteen public packages are prepared at 0.2.0; nothing is published by this
@@ -103,11 +110,18 @@ If that path fails before the answer, the duration ends at the failure point.
 Packing, cleanup and the gateway's later compiled-server 503 drive are outside
 that interval. The ADK Go edited-source control described below is also excluded.
 The default budget is 10 minutes per project; `--budget-minutes` accepts integers
-from 1 to 60. An overrun adds a gating `budget` failure with the summary
-`budget exceeded: <measured> ms of <allowed> ms`. The elapsed-time gate is
-evaluated after the project run. Each CI leg also has a 45-minute job timeout.
-JSON results are printed to the job log and
-per-project durations are written to the job summary.
+from 1 to 60. A run longer than the allowance adds a gating `budget` failure with the summary
+`budget exceeded: <measured> ms of <allowed> ms`.
+
+Gateway results also record `serverDurationMs` from the start of TypeScript
+compilation through the compiled server's session probe and Chromium 503 drive,
+or to the point where that leg fails. The field is `null` if the leg never
+started. Cleanup is outside this interval. `--server-budget-minutes` accepts
+integers from 1 to 60 and defaults to 2. A leg longer than the allowance adds a gating `budget` failure
+with `server budget exceeded: <measured> ms of <allowed> ms`. Both elapsed-time
+gates are evaluated after the project run. Each CI leg also has a 45-minute job
+timeout. JSON results are printed to the job log, and scaffold-to-preview
+durations are written to the job summary.
 
 The scope output skips this job only for a non-empty documents-only change list
 (Markdown, paths under `docs/`, or `llms.txt`); other changes and unknown/empty
@@ -450,7 +464,7 @@ The original driver also rejected the documented Trusted Types eval probe and th
 
 ## Plan deviations
 
-The delegated retry decision allows one additional diagnostic class: a Chromium resource-load 503 console error only during the deliberate hybrid unavailable step, correlated by its exact URL with a response event observed in that step at `/api/v1/chat/completions` with status 503. All other console errors, page errors, failed requests and HTTP errors fail. Offline Chromium controls cover a correlated pass, an uncorrelated diagnostic, another path, status 500, an error outside the step and a failed request. The Trusted Types probe is allowed at most once, with either exact Chromium wording of the documented probe.
+The delegated retry decision allows one additional diagnostic class: a Chromium resource-load 503 console error only during the deliberate hybrid unavailable step, correlated by its exact URL with a response event observed in that step at `/api/v1/chat/completions` with status 503. Offline Chromium controls cover a correlated pass, an uncorrelated diagnostic, another path, status 500, an error outside the step and a failed request. The characterization allowed one Trusted Types probe with either exact Chromium wording. The current driver fails on the first such error for every framework.
 
 The workspace build is the necessary exception to the plan's blanket temporary-write wording: `build:packages` writes ordinary ignored package outputs in the checkout before packing. Copied installs, tarballs, cache and npm configuration stay in the owned temporary root; requested JSON/log evidence stays outside the checkout. No user configuration is modified.
 
@@ -592,7 +606,8 @@ and wiring result, not a model-quality or device-performance measurement.
 
 The JSON output is an array of results: `template`, verified `node` (or the requested
 major if version resolution fails), exact `npm` (or `unknown` before its probe),
-`mode`, `releaseAgeDays`, `exclude`, `browser`, `durationMs` and `failures`. Each failure contains
+`mode`, `releaseAgeDays`, `exclude`, `browser`, `durationMs`, `serverDurationMs`
+and `failures`. Each failure contains
 `phase`, `gating`, `source`, `suggested`, `summary` and `excerpt`; the parent result
 supplies the combination/node/mode identity. Current phases are node, pack,
 scaffold, install, build, check, negative-control, compile, serve, drive, probe and budget.
@@ -603,6 +618,14 @@ root, HOME, URLs and credential-like fields and are capped at 16 lines/4000
 characters. Any gating or unclassified failure causes exit 1; usage errors exit 2.
 The human-readable matrix and JSON describe the same results. `--mode both`
 compares failures as pass, defect, release-gap or workspace-regression.
+
+Chromium reports failed requests with the navigation or numbered drive action
+that started them, the HTTP status or browser error code and request elapsed
+time. The excerpt shows known scaffold paths, replaces any other path with
+`<path redacted>` (built asset names become `<file>`) and omits URL origins,
+queries and fragments. The harness requires a successful
+HTTP readiness response before opening Chromium. Each drive makes one initial
+navigation attempt.
 
 `pnpm check` does not run the real network matrix. Its Node conformance lane runs
 [the offline tests](../tests/conformance/verify-standalone.node.test.ts): pure

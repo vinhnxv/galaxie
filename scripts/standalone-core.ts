@@ -62,6 +62,7 @@ export interface Result {
   readonly exclude: string | null;
   browser: string | null;
   durationMs: number;
+  serverDurationMs: number | null;
   readonly failures: Failure[];
 }
 export interface Step {
@@ -128,6 +129,7 @@ export interface Options {
   readonly verifyReleaseAge?: boolean;
   readonly cleanPath?: boolean;
   readonly budgetMinutes?: number;
+  readonly serverBudgetMinutes?: number;
 }
 export interface ScaffoldRequest {
   readonly spec: TemplateSpec;
@@ -567,6 +569,19 @@ async function assertGoSourceRejection(
   await build();
 }
 
+function checkBudget(result: Result, durationMs: number, minutes: number, label: string): void {
+  const allowedMs = minutes * 60_000;
+  if (durationMs > allowedMs)
+    result.failures.push({
+      phase: 'budget',
+      gating: true,
+      source: 'harness',
+      suggested: true,
+      summary: `${label} exceeded: ${durationMs} ms of ${allowedMs} ms`,
+      excerpt: '',
+    });
+}
+
 /** One owned temporary root, one pipeline for registry and packed installations. */
 export async function runStandalone(
   options: Options,
@@ -712,15 +727,22 @@ export async function runStandalone(
             exclude: options.exclude ?? null,
             browser: null,
             durationMs: 0,
+            serverDurationMs: null,
             failures: [],
           };
           results.push(result);
           let phase: Phase = 'node';
           let started: number | undefined;
           let finished: number | undefined;
+          let serverStarted: number | undefined;
+          let serverFinished: number | undefined;
           let excludedDurationMs = 0;
+          const finishLeg = (): void => {
+            if (serverStarted !== undefined) serverFinished ??= clock.now();
+            else if (started !== undefined) finished ??= clock.now();
+          };
           const record = (error: unknown): void => {
-            if (started !== undefined) finished ??= clock.now();
+            finishLeg();
             const message = error instanceof Error ? error.message : 'Unknown failure.';
             result.failures.push({
               phase,
@@ -854,7 +876,7 @@ export async function runStandalone(
                 }
                 phase = 'drive';
                 result.browser = await dependencies.driver.drive(url, { ...spec, steps }, signal);
-                finished ??= clock.now();
+                finishLeg();
               } catch (error) {
                 record(error);
               } finally {
@@ -876,6 +898,7 @@ export async function runStandalone(
               previewPort,
             );
             if (spec.server !== undefined) {
+              serverStarted = clock.now();
               phase = 'compile';
               await run(spec.server.compile);
               phase = 'serve';
@@ -887,16 +910,16 @@ export async function runStandalone(
           } finally {
             if (started !== undefined)
               result.durationMs = (finished ?? clock.now()) - started - excludedDurationMs;
-            const allowedMs = (options.budgetMinutes ?? 10) * 60_000;
-            if (result.durationMs > allowedMs)
-              result.failures.push({
-                phase: 'budget',
-                gating: true,
-                source: 'harness',
-                suggested: true,
-                summary: `budget exceeded: ${result.durationMs} ms of ${allowedMs} ms`,
-                excerpt: '',
-              });
+            checkBudget(result, result.durationMs, options.budgetMinutes ?? 10, 'budget');
+            if (serverStarted !== undefined) {
+              result.serverDurationMs = (serverFinished ?? clock.now()) - serverStarted;
+              checkBudget(
+                result,
+                result.serverDurationMs,
+                options.serverBudgetMinutes ?? 2,
+                'server budget',
+              );
+            }
           }
         }
     return results;
