@@ -6,6 +6,13 @@ and ranges against the target file. Temporary-copy tests detect removed guards;
 the tracing guide identifies provider IDs as a host-owned set. No product runtime
 behavior or ADR-0012 guarantee changes, and no live stack was run.
 
+The tracing-sink spike's score, browser and coverage result writers now use its
+local JSON serializer. Offline tests preserve all thirteen committed result
+files' bytes, exercise the live-host exporter with a stub at both its default
+and configured destinations, and verify tracing shutdown and temporary-directory
+removal after a Pyodide preparation timeout. The local offline suite passes;
+live collector/backend ingestion was not rerun.
+
 On 2026-11-17, Python starter prepack compares both local wheels' Python modules
 with their repository sources and checks metadata-input hashes recorded by the
 trusted wheel build. Older cache inventories require rebuilding; these hashes

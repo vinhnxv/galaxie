@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import type { IncomingMessage } from 'node:http';
 import { setTimeout } from 'node:timers/promises';
-import { fileURLToPath } from 'node:url';
 import type { BrowserContext, Page } from 'playwright-core';
 import { expect, test } from 'vitest';
 import { assertSpanTree } from '../../../packages/core/test/span-tree.js';
@@ -23,6 +21,7 @@ import {
   scanRequests,
   summarizeRequests,
 } from '../src/request-scan.js';
+import { resultJson } from '../src/result-json.js';
 import { scenarioReadback } from '../src/scenario-readback.js';
 import type { ScenarioResult } from '../src/scenarios.js';
 import { readEnv } from '../src/secrets.js';
@@ -32,16 +31,16 @@ if (process.env['LLMOPS_STACK'] !== '1')
 
 const folder = new URL('../results/', import.meta.url);
 function writeResult(name: string, value: unknown): void {
-  const serialized = JSON.stringify(value, null, 2);
-  const formatted = execFileSync(
-    fileURLToPath(new URL('../../../node_modules/.bin/biome', import.meta.url)),
-    ['format', '--stdin-file-path', `results/${name}`],
-    {
-      input: `${name === 'browser-evidence.json' ? serialized.replace(/assets\/index-[A-Za-z0-9_-]+\.js/g, 'assets/index-<hash>.js') : serialized}\n`,
-      encoding: 'utf8',
-    },
-  );
-  writeFileSync(new URL(name, folder), formatted);
+  const normalized =
+    name === 'browser-evidence.json'
+      ? JSON.parse(
+          JSON.stringify(value).replace(
+            /assets\/index-[A-Za-z0-9_-]+\.js/g,
+            'assets/index-<hash>.js',
+          ),
+        )
+      : value;
+  writeFileSync(new URL(name, folder), resultJson(normalized));
 }
 function decode(result: PageResult): ScenarioResult {
   const decoded = { ...result, spans: decodeSpans(result.spans) };
