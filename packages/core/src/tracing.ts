@@ -59,6 +59,7 @@ const ALLOWED = new Set([
   'gen_ai.usage.output_tokens',
 ]);
 const NOOP_HANDLE: TraceHandle = { end: () => {} };
+const MAX_ROOT_TEXT_BYTES = 16 * 1024;
 
 function safeName(value: string): string {
   return value.length >= 1 && value.length <= 128 && !/\p{Cc}/u.test(value) ? value : '_OTHER';
@@ -149,6 +150,7 @@ export interface RunInstrumentation {
   setLabels(labels: readonly DataLabel[]): void;
   recordBudget(name: keyof BudgetLimits): void;
   recordRender(status: 'rendered' | 'failed', code?: ErrorCode): void;
+  recordOutput(value: unknown): void;
   finish(status: RunStatus, error?: ErrorInfo): void;
 }
 
@@ -165,9 +167,16 @@ export function startRunTrace(
   parent: Context,
   metadata: RunMetadata,
   options?: {
-    readonly developmentTraceText?: { readonly destination: DestinationClass };
+    readonly developmentTraceText?: {
+      readonly destination: DestinationClass;
+      readonly root?: {
+        readonly input?: unknown;
+        readonly unlabelledString: (input: string) => boolean;
+        readonly payloadBytes: number;
+      };
+    };
     readonly policy: Readonly<Record<DataLabel, DestinationAllowlist>>;
-    readonly labels: () => Iterable<DataLabel>;
+    readonly labels: (root: boolean) => Iterable<DataLabel>;
   },
 ): RunInstrumentation {
   const root = tracer.startSpan(
@@ -193,23 +202,59 @@ export function startRunTrace(
   const steps = new Map<object, StepRecord>();
   const labels: { value: readonly DataLabel[] } = { value: [] };
   let closed = false;
+  const { developmentTraceText, labels: liveLabels, policy } = options ?? {};
+  const { destination, root: rootText } = developmentTraceText ?? {};
+  const rootTextLimit =
+    rootText === undefined ? undefined : Math.min(MAX_ROOT_TEXT_BYTES, rootText.payloadBytes);
+  // UTF-16 code units are a lower bound on the size after JSON escaping and UTF-8 encoding.
+  const candidate = (value: unknown): string | undefined =>
+    rootTextLimit !== undefined &&
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= rootTextLimit
+      ? value
+      : undefined;
+  let input = candidate(rootText?.input);
+  const privateInput = input !== undefined && rootText?.unlabelledString(input) === true;
+  let output: string | undefined;
   const text = (
     span: Span,
     key: 'gen_ai.input.messages' | 'gen_ai.output.messages' | 'gen_ai.tool.call.arguments',
     value: unknown,
+    bounds?: { readonly limit: number; readonly privateUser: boolean },
   ): void => {
-    const optIn = options?.developmentTraceText;
-    if (closed || optIn === undefined || options === undefined) return;
-    const currentLabels = [...options.labels()];
     if (
-      inBrowserOnly(options.policy, currentLabels) ||
-      !labelsAllow(options.policy, currentLabels, optIn.destination)
+      (closed && bounds === undefined) ||
+      destination === undefined ||
+      liveLabels === undefined ||
+      policy === undefined
     )
+      return;
+    const currentLabels = [...liveLabels(bounds !== undefined)];
+    if (bounds?.privateUser) currentLabels.push('private-user');
+    if (inBrowserOnly(policy, currentLabels) || !labelsAllow(policy, currentLabels, destination))
       return;
     try {
       const encoded = JSON.stringify(value);
-      if (encoded !== undefined) span.setAttribute(key, encoded);
+      if (
+        encoded !== undefined &&
+        (bounds === undefined || new TextEncoder().encode(encoded).byteLength <= bounds.limit)
+      )
+        span.setAttribute(key, encoded);
     } catch {}
+  };
+  const recordRootMessage = (
+    role: 'user' | 'assistant',
+    content: string | undefined,
+    privateUser: boolean,
+  ): void => {
+    if (content === undefined || rootTextLimit === undefined) return;
+    text(
+      root,
+      role === 'user' ? 'gen_ai.input.messages' : 'gen_ai.output.messages',
+      [{ role, parts: [{ type: 'text', content }] }],
+      { limit: rootTextLimit, privateUser },
+    );
   };
   const end = (record: StepRecord, result: TraceResult | CapabilityResult): void => {
     if (record.ended) return;
@@ -252,7 +297,7 @@ export function startRunTrace(
   };
   return {
     recorder: {
-      recordsText: options?.developmentTraceText !== undefined,
+      recordsText: developmentTraceText !== undefined,
       start(step, parentHandle): TraceHandle {
         if (closed) return NOOP_HANDLE;
         const ancestor = parentHandle === undefined ? undefined : steps.get(parentHandle);
@@ -360,6 +405,9 @@ export function startRunTrace(
         )
         .end();
     },
+    recordOutput(value): void {
+      if (!closed) output = candidate(value);
+    },
     finish(status, error): void {
       if (closed) return;
       closed = true;
@@ -383,6 +431,17 @@ export function startRunTrace(
         }),
       );
       if (status === 'failed') root.setStatus({ code: SpanStatusCode.ERROR });
+      if (status === 'succeeded' || status === 'waiting_input') {
+        // Root text is a development aid: a failure here must never keep the root open.
+        try {
+          recordRootMessage('user', input, privateInput);
+          if (status === 'succeeded') recordRootMessage('assistant', output, true);
+        } catch {
+          // The attributes stay absent.
+        }
+      }
+      input = undefined;
+      output = undefined;
       root.end();
       steps.clear();
     },

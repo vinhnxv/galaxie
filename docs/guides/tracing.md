@@ -28,9 +28,9 @@ Nodes and capabilities use `INTERNAL` spans; model calls use `CLIENT` spans.
 Each pause closes its segment with `waiting_input`; a resume opens a new root
 with the same run ID and an incremented `galaxie.run.segment` starting from zero.
 
-The Proposed decisions for [development text on root spans](../adr/0032-development-text-on-agent-root-spans.md)
-and [LangGraph Python and ADK Go span coverage](../adr/0033-brokered-node-and-model-spans.md)
-describe follow-up implementation.
+Core implements the root text capture in [ADR-0032](../adr/0032-development-text-on-agent-root-spans.md).
+[LangGraph Python and ADK Go span coverage](../adr/0033-brokered-node-and-model-spans.md)
+remains follow-up work.
 
 The source records the GenAI convention pin as
 `open-telemetry/semantic-conventions-genai@51a0f580f8a6ad804ca4de5e033683c6fbbe5906`,
@@ -47,7 +47,8 @@ attribute or a schema URL supplied to `getTracer`. The conventions are Developme
 | Model | `gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `galaxie.model.provider`, `galaxie.destination.class`, `galaxie.output_safety` when supplied |
 | Capability | `gen_ai.operation.name`, `gen_ai.tool.name`, `galaxie.capability.kind`, `galaxie.destination.class` |
 | Steps and failures | `galaxie.step.status`, `error.type`, `galaxie.error.code` where applicable |
-| Development text (opt-in, subject to live labels and destination) | `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.tool.call.arguments` |
+| Root and model development text (opt-in, subject to live labels and destination) | `gen_ai.input.messages`, `gen_ai.output.messages` |
+| Capability development text (opt-in, subject to live labels and destination) | `gen_ai.tool.call.arguments` |
 
 Attributes are conditional: missing usage, route information or model names do
 not become invented values. `error.type` is a constrained type name, never the
@@ -209,6 +210,36 @@ For collector fan-out, `developmentTraceText.destination` **must** be the
 least-trusted class among all exporters in the pipeline: use `third-party` if
 any exporter sends to a hosted service. Labels are checked against the one
 declared class, not separately for each exporter.
+
+Core records agent invocation text on the `invoke_agent` root just before
+each segment ends. An initial segment that succeeds or pauses can record its
+schema-validated, normalized start input. A successful segment, including a
+resume, can record its accepted terminal output. Both candidates must be
+nonempty strings. Resumed segments omit input, paused segments omit output,
+and failed or cancelled segments omit both. Structured values, partial streams,
+submissions, checkpoints and pending interactions are outside this capture.
+
+Each root attribute is a JSON string containing a one-message array with one
+`text` part. The input message has role `user` and the output message has role
+`assistant`. The output omits `finish_reason`. Core checks the live labels at
+settlement, including private labels from submitted text and restored data.
+An unlabelled start string and every reply also carry `private-user` for this
+check. If the compiled schema leaves any reachable unlabelled string branch,
+an unlabelled alternative also triggers this classification. Core uses the
+schema's types and literal values without rerunning string patterns or custom
+refinements. With the default policy, `private-user` suppresses trace text even
+for an in-browser destination.
+
+Each complete encoded root attribute is limited to the smaller of 16 KiB and
+the configured `payloadBytes`, measured in UTF-8 after JSON escaping. Core
+bounds candidates before serialization and omits an oversized attribute whole.
+Execution and its payload accounting use their existing limits. The host
+collector owns any mapping to backend request or response fields. Backend
+readback for eligible root text is unmeasured. The object-shaped graph from the
+trace-sink measurements remains ineligible for root text.
+Root text is whatever the agent reports at the segment boundary, and
+browser-side spans can be forged by page code, so treat it as a development
+aid and never as an audit record.
 
 These opted-in messages and arguments are verbatim: agent code can put tool
 results, URLs or error text inside them. They are not redacted. galaxie adds no
