@@ -39,6 +39,10 @@ const spawnInstall: InstallRunner = (command) =>
     });
   });
 
+export function installFlag(packageManager: PackageManager, tarballMode: boolean): string {
+  return tarballMode && packageManager === 'yarn' ? '--mode=skip-build' : '--ignore-scripts';
+}
+
 export async function install(
   packageManager: PackageManager,
   cwd: string,
@@ -46,13 +50,15 @@ export async function install(
     readonly env?: NodeJS.ProcessEnv;
     readonly platform?: NodeJS.Platform;
     readonly runner?: InstallRunner;
+    readonly tarballMode?: boolean;
   } = {},
 ): Promise<boolean> {
   if ((options.platform ?? process.platform) === 'win32') return false;
+  const flag = installFlag(packageManager, options.tarballMode === true);
   try {
     await (options.runner ?? spawnInstall)({
       executable: packageManager,
-      args: ['install', '--ignore-scripts'],
+      args: ['install', flag],
       cwd,
       env: options.env ?? process.env,
       shell: false,
@@ -60,7 +66,7 @@ export async function install(
     return true;
   } catch {
     throw new InstallError(
-      `Installation failed. Run ${packageManager} install --ignore-scripts in the project directory.`,
+      `Installation failed. Run ${packageManager} install ${flag} in the project directory.`,
     );
   }
 }

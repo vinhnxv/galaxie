@@ -297,28 +297,81 @@ test.each(['empty', 'relative', 'absent', 'missing', 'duplicate', 'symlink'] as 
   },
 );
 
-test.each(['pnpm', 'yarn'])(
-  'tarball mode refuses unproven %s installs before writing',
-  async (manager) => {
+test.each([
+  ['pnpm', '11.21.0', '--ignore-scripts'],
+  ['yarn', '4.18.1', '--mode=skip-build'],
+] as const)(
+  'the %s CLI scaffolds local tarballs and suppresses install scripts',
+  async (manager, version, flag) => {
     const { root, packed } = await fixture();
-    const stderr = new PassThrough();
-    let errors = '';
-    stderr.on('data', (bytes: Buffer) => {
-      errors += bytes.toString();
-    });
+    const installs: unknown[] = [];
     expect(
-      await run(['my-app', 'browser-only', 'langgraph-js', '--no-install'], {
+      await run(['my-app', 'browser-only', 'langgraph-js'], {
         cwd: root,
         templatesRoot,
         stdout: new PassThrough(),
-        stderr,
-        env: { GALAXIE_CREATE_PACKAGE_DIR: packed, npm_config_user_agent: `${manager}/1` },
+        stderr: new PassThrough(),
+        env: { GALAXIE_CREATE_PACKAGE_DIR: packed, npm_config_user_agent: `${manager}/${version}` },
+        platform: 'linux',
+        runner: async ({ executable, args, shell }) => {
+          installs.push({ executable, args, shell });
+        },
       }),
-    ).toBe(1);
-    expect(errors).toContain('Tarball mode supports npm only');
-    expect(existsSync(join(root, 'my-app'))).toBe(false);
+    ).toBe(0);
+    expect(installs).toEqual([{ executable: manager, args: ['install', flag], shell: false }]);
+    const project = join(root, 'my-app');
+    const source = await readFile(join(project, 'package.json'), 'utf8');
+    const manifest = JSON.parse(source);
+    expect(manifest.dependencies['@galaxie-ai/core']).toBe(
+      `file:${packed}/galaxie-ai-core-0.1.0.tgz`,
+    );
+    expect(manifest.dependencies.react).toBe('19.3.1');
+    expect(manifest).not.toHaveProperty('overrides');
+    expect(manifest).not.toHaveProperty('pnpm');
+    if (manager === 'pnpm') {
+      expect(manifest.dependencies).not.toHaveProperty('@opentelemetry/api');
+      expect(manifest.dependencies).not.toHaveProperty('@langchain/langgraph-checkpoint');
+      expect(await readFile(join(project, 'pnpm-workspace.yaml'), 'utf8')).toMatch(/^overrides:\n/);
+      expect(manifest).not.toHaveProperty('resolutions');
+      expect(existsSync(join(project, '.yarnrc.yml'))).toBe(false);
+    } else {
+      expect(manifest.dependencies['@opentelemetry/api']).toBe('1.10.0');
+      expect(manifest.dependencies['@langchain/langgraph-checkpoint']).toBe('1.2.2');
+      const resolutions = Object.fromEntries(
+        names.map((name) => [`@galaxie-ai/${name}`, `file:${packed}/galaxie-ai-${name}-0.1.0.tgz`]),
+      );
+      expect(manifest.resolutions).toEqual(resolutions);
+      expect(source).toContain(
+        `  "resolutions": ${JSON.stringify(resolutions, null, 2).replaceAll('\n', '\n  ')}\n`,
+      );
+      expect(await readFile(join(project, '.yarnrc.yml'), 'utf8')).toBe(
+        'nodeLinker: node-modules\n',
+      );
+      expect(existsSync(join(project, 'pnpm-workspace.yaml'))).toBe(false);
+    }
   },
 );
+
+test.each(['bun', 'unknown'])('tarball mode refuses %s before writing', async (manager) => {
+  const { root, packed } = await fixture();
+  const stderr = new PassThrough();
+  let errors = '';
+  stderr.on('data', (bytes: Buffer) => {
+    errors += bytes.toString();
+  });
+  expect(
+    await run(['my-app', 'browser-only', 'langgraph-js', '--no-install'], {
+      cwd: root,
+      templatesRoot,
+      stdout: new PassThrough(),
+      stderr,
+      env: { GALAXIE_CREATE_PACKAGE_DIR: packed, npm_config_user_agent: `${manager}/1` },
+    }),
+  ).toBe(1);
+  expect(errors).toBe('Tarball mode requires npm, pnpm or yarn.\n');
+  expect(await readdir(root)).toEqual(['packed']);
+  expect(existsSync(join(root, 'my-app'))).toBe(false);
+});
 
 test('ADK tarballs add one adapter without changing the seven launch inventory', async () => {
   const { root, packed } = await fixture();

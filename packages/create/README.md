@@ -12,7 +12,7 @@ npm create @galaxie-ai@0.2.0 -- my-app browser-only langgraph-js
 npm create @galaxie-ai@0.2.0 -- my-app --kind gateway --framework adk-go
 ```
 
-`npm create @galaxie-ai` selects this CLI; the explicit `@0.2.0` selects the prepared release. Generated `@galaxie-ai/*` dependencies use `^0.2.0` caret ranges. Upgrade all galaxie pins together for a lockstep bump. These registry commands remain unverified until publication; use local npm tarballs now.
+`npm create @galaxie-ai` selects this CLI; the explicit `@0.2.0` selects the prepared release. Generated `@galaxie-ai/*` dependencies use `^0.2.0` caret ranges. Upgrade all galaxie pins together for a lockstep bump. These registry commands remain unverified until publication; use local tarballs now.
 
 Build it from this checkout using the repository's Node 24 and pnpm 11 tooling:
 
@@ -40,10 +40,10 @@ The current kinds are `browser-only` and `gateway`:
 
 | Framework | Both kinds | Install path |
 | --- | --- | --- |
-| `langgraph-js` | Yes | npm tarballs; 0.2.0 registry verification pending |
-| `adk-js` | Yes | npm tarballs; registry verification pending |
-| `adk-go` | Both | npm tarballs; registry verification pending |
-| `langgraph-python` | Yes | npm tarballs; registry verification pending |
+| `langgraph-js` | Yes | local tarballs; 0.2.0 registry verification pending |
+| `adk-js` | Yes | local tarballs; registry verification pending |
+| `adk-go` | Both | local tarballs; registry verification pending |
+| `langgraph-python` | Yes | local tarballs; registry verification pending |
 
 ADK asks the same scripted quiz through a long-running `question.ask@1` capability,
 then validates the answer and requests a text-only closing comment. Native
@@ -56,21 +56,22 @@ Types baseline. The gateway check also compiles and probes its static handler, r
 ## Installation
 
 The CLI detects npm, pnpm or yarn from `npm_config_user_agent`, defaults to npm,
-and prints a fallback note for another manager. It runs
-`<manager> install --ignore-scripts` without a shell. `--no-install` skips this
+and prints a fallback note for another manager in registry mode. It runs
+`<manager> install --ignore-scripts` without a shell. Yarn 4 tarball mode uses
+`yarn install --mode=skip-build`. `--no-install` skips this
 step. On Windows automatic installation is skipped and the command is printed.
 An install failure leaves the generated files and prints the manual command.
 The CLI does not change registry or release-age configuration.
 
-The standalone harness measures npm installation with scripts disabled. A plain pnpm 11 ADK install is also measured; the harness still uses npm.
-Other manager installs and Windows automatic installation remain unmeasured.
+The standalone harness installs with scripts disabled. Windows automatic installation
+remains unmeasured.
 The package declares Node `>=22.22.2`; the measured patches are recorded in the
 [standalone verification record](../../docs/standalone-verification.md).
 
 Framework layers may declare `pnpm.allowBuilds`, a map of package names to boolean
 build-script decisions. Composition merges matching decisions and rejects conflicts.
-Only pnpm projects with decisions receive a sorted `pnpm-workspace.yaml`; other
-managers and the LangGraph layer emit no additional file. The ADK layer refuses
+Only pnpm projects with build decisions or tarball overrides receive a sorted
+`pnpm-workspace.yaml`. The ADK layer refuses
 scripts for `@google/genai`, `cpu-features`, `protobufjs` and `ssh2`, including the
 additional packages found by the plain-install probe. Automatic installs still use
 `--ignore-scripts`.
@@ -83,27 +84,31 @@ Set `GALAXIE_CREATE_PACKAGE_DIR` to an absolute, existing directory containing
 exactly one `galaxie-ai-<name>-<version>.tgz` for each of the seven launch packages:
 `ui-protocol`, `core`, `adapter-kit`, `adapter-langgraph`, `models`,
 `storage-indexeddb` and `react`. Missing or duplicate matches fail before writing.
-Every direct galaxie dependency and all seven npm overrides use absolute `file:`
+Every direct galaxie dependency and all seven overrides use absolute `file:`
 specifications. Third-party pins stay unchanged. Tarball mode prints a one-line notice
 and checks the name and version in each tarball's `package.json` against its file name
 before writing; a mismatch fails with the field and expected value. The reader is a
 consistency check, not a security boundary: it refuses archives with pax or GNU extended
 headers, stops after 512 MiB of decompressed data and reads only `package/package.json`.
 
-Tarball mode supports npm only and refuses pnpm and yarn before writing, including
-with `--no-install`. Their real installs and the pnpm 11 override location are
-deferred. For ADK the harness additionally builds and packs `adapter-adk`.
+Tarball mode supports npm, pnpm 11 and Yarn 4. npm writes `overrides` to
+`package.json`. pnpm writes `overrides` to `pnpm-workspace.yaml` alongside any
+build decisions. Yarn writes `resolutions` to `package.json`, selects the
+`node-modules` linker and declares the required peers that Yarn does not
+auto-install. If the CLI detects Bun or an unknown manager, it exits before
+writing, including with `--no-install`. Direct Node invocation defaults to npm.
+Set `npm_config_user_agent=pnpm/11.21.0` or `npm_config_user_agent=yarn/4.18.1`
+when invoking the built CLI directly to select that manager's files.
 
 `@galaxie-ai/adapter-adk` is prepared for the same lockstep release. Until its release, ADK project
-resolution requires npm tarball mode: set `GALAXIE_CREATE_PACKAGE_DIR` to a directory
+resolution requires tarball mode: set `GALAXIE_CREATE_PACKAGE_DIR` to a directory
 containing one tarball for each of the seven launch packages and one for
 `adapter-adk`. All eight overrides and the selected direct galaxie dependencies use
 absolute `file:` specifications. LangGraph resolution still uses seven tarballs
 and ignores an extra ADK adapter tarball. Registry-mode ADK installs are unsupported.
-Tarball mode continues to refuse pnpm and yarn before any project write.
 
 For `adk-go`, pack `adapter-go` and `starter-go` in addition to the seven launch
-packages with Go 1.27.3 on PATH. All nine npm overrides point to those tarballs.
+packages with Go 1.27.3 on PATH. All nine overrides point to those tarballs.
 The generated [Go workflow](../../templates/frameworks/adk-go/files/GO.md) explains
 the source hash, verified cache/prebuilt/local precedence, exact toolchain,
 module layout and upgrade limits. A fresh project uses the prebuilt without Go;
@@ -112,7 +117,7 @@ with no HMR client. Both kinds support it; the standalone harness measurement is
 
 For `langgraph-python`, additionally pack `adapter-pyodide` and `starter-python`.
 Prepare the wheel cache and run starter-python's complete prepack first, as its
-[README](../starter-python/README.md) describes. All nine npm overrides use the
+[README](../starter-python/README.md) describes. All nine overrides use the
 tarballs. The generated [Python workflow](../../templates/frameworks/langgraph-python/files/PYTHON.md)
 explains raw source edits, wheel/runtime verification and license limits. Building
 and previewing a generated project needs neither Python nor uv; its `dev` command
@@ -122,7 +127,7 @@ recorded in the standalone verification record.
 
 ## Release evidence and limits
 
-The repository pack test inspects all thirteen public packages with matching versions and exact packed internal dependencies. The packed-create test extracts the CLI into a temporary directory with only Node, runs `--help` and scaffolds with `--no-install`, comparing all output with checkout output. `create-clean` CI covers four frameworks in both kinds on Ubuntu Node 24, plus both LangGraph.js kinds on Node 22; local standalone runs cover npm tarballs and mock answers. Registry installs of 0.2.0 await publication. Real models, devices, pnpm/yarn tarball mode and non-Linux CI remain unverified.
+The repository pack test inspects all thirteen public packages with matching versions and exact packed internal dependencies. The packed-create test extracts the CLI into a temporary directory with only Node, runs `--help` and scaffolds with `--no-install`, comparing all output with checkout output. `create-clean` CI covers four frameworks in both kinds on Ubuntu Node 24, plus both LangGraph.js kinds on Node 22; standalone runs drive mock answers. See the [standalone verification record](../../docs/standalone-verification.md) for package-manager coverage. Registry installs of 0.2.0 await publication. Real models, devices and non-Linux CI remain unverified.
 
 ## Layers and writes
 
@@ -208,7 +213,7 @@ versions, commands and limits. Nothing in this workflow publishes a package.
 
 Licensed under Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
-For the Python starter, the standalone harness accepts only npm tarballs:
+To run the Python starter's standalone verification with npm:
 
 ```sh
 node scripts/verify-standalone.ts --framework langgraph-python --mode tarball --tarballs <tarballs> --json /tmp/galaxie-python.json
