@@ -5,6 +5,7 @@ import { writeFile } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Request } from 'playwright';
+import type { PackageManager } from '../packages/create/src/packages.js';
 import type { Mode, NodeRequest, Result, Step, TemplateSpec } from './standalone-core.js';
 
 export interface Arguments {
@@ -12,6 +13,7 @@ export interface Arguments {
   framework: 'langgraph-js' | 'adk-js' | 'adk-go' | 'langgraph-python';
   nodes: NodeRequest[];
   mode: Mode | 'both';
+  packageManager: PackageManager;
   tarballs?: string;
   json?: string;
   exclude?: string;
@@ -27,6 +29,7 @@ export const usage = `Usage: node scripts/verify-standalone.ts [options]
                                             (default langgraph-js; others are tarball-only)
   --node <major>[=/path/to/node]            (repeatable; default current)
   --mode registry|tarball|both              (default registry)
+  --package-manager npm|pnpm|yarn          (default npm; pnpm and yarn need Corepack and tarball mode)
   --tarballs <directory>                   reuse seven packed launch packages
   --json <file>                            write the result array
   --min-release-age-exclude <pattern>       explicit, recorded npm exclusion
@@ -45,6 +48,7 @@ export function parseArguments(args: readonly string[]): Arguments {
     framework: 'langgraph-js',
     nodes: [],
     mode: 'registry',
+    packageManager: 'npm',
     keep: false,
     cleanPath: false,
     budgetMinutes: 10,
@@ -89,6 +93,10 @@ export function parseArguments(args: readonly string[]): Arguments {
         if (value !== 'registry' && value !== 'tarball' && value !== 'both') invalid();
         options.mode = value;
         break;
+      case '--package-manager':
+        if (value !== 'npm' && value !== 'pnpm' && value !== 'yarn') invalid();
+        options.packageManager = value;
+        break;
       case '--node': {
         const match = /^(\d+)(?:=(.+))?$/.exec(value);
         if (match === null || Number(match[1]) < 22) invalid();
@@ -120,6 +128,12 @@ export function parseArguments(args: readonly string[]): Arguments {
     }
   }
   if (!options.help && options.framework !== 'langgraph-js' && options.mode !== 'tarball')
+    invalid();
+  if (
+    !options.help &&
+    options.packageManager !== 'npm' &&
+    (options.mode !== 'tarball' || options.exclude !== undefined)
+  )
     invalid();
   if (options.nodes.length === 0)
     options.nodes.push({ major: Number(process.versions.node.split('.')[0]) });
@@ -371,7 +385,7 @@ export function renderResults(results: readonly Result[]): string {
   return results
     .map(
       (result) =>
-        `${result.template} | ${result.node} | npm ${result.npm} | ${result.mode} | ${result.failures.some((failure) => failure.gating || failure.source === 'unclassified') ? 'FAIL' : 'PASS'} | ${result.durationMs} ms${result.serverDurationMs === null ? '' : ` | server ${result.serverDurationMs} ms`} | release age ${result.releaseAgeDays}d${result.exclude === null ? '' : `; exclusion ${result.exclude}`}\n${result.failures.map((failure) => `  ${failure.phase} [${failure.source}]${failure.gating ? '' : ' (advisory)'}: ${failure.summary}\n${failure.excerpt}`).join('\n')}`,
+        `${result.template} | ${result.node} | ${result.packageManager} ${result.packageManagerVersion} | ${result.mode} | ${result.failures.some((failure) => failure.gating || failure.source === 'unclassified') ? 'FAIL' : 'PASS'} | ${result.durationMs} ms${result.serverDurationMs === null ? '' : ` | server ${result.serverDurationMs} ms`} | release age ${result.releaseAgeDays}d${result.exclude === null ? '' : `; exclusion ${result.exclude}`}\n${result.failures.map((failure) => `  ${failure.phase} [${failure.source}]${failure.gating ? '' : ' (advisory)'}: ${failure.summary}\n${failure.excerpt}`).join('\n')}`,
     )
     .join('\n');
 }
@@ -396,6 +410,7 @@ if (import.meta.main) {
           repo: fileURLToPath(new URL('..', import.meta.url)),
           nodes: options.nodes,
           modes: options.mode === 'both' ? ['registry', 'tarball'] : [options.mode],
+          packageManager: options.packageManager,
           specs: templateSpecs.filter(
             (spec) =>
               spec.framework === options.framework &&

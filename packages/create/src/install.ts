@@ -39,6 +39,10 @@ const spawnInstall: InstallRunner = (command) =>
     });
   });
 
+export function installFlag(packageManager: PackageManager, tarballMode: boolean): string {
+  return tarballMode && packageManager === 'yarn' ? '--mode=skip-build' : '--ignore-scripts';
+}
+
 export async function install(
   packageManager: PackageManager,
   cwd: string,
@@ -46,21 +50,26 @@ export async function install(
     readonly env?: NodeJS.ProcessEnv;
     readonly platform?: NodeJS.Platform;
     readonly runner?: InstallRunner;
+    readonly tarballMode?: boolean;
   } = {},
 ): Promise<boolean> {
   if ((options.platform ?? process.platform) === 'win32') return false;
+  const yarnTarballs = options.tarballMode === true && packageManager === 'yarn';
+  const flag = installFlag(packageManager, options.tarballMode === true);
+  const env = options.env ?? process.env;
   try {
     await (options.runner ?? spawnInstall)({
       executable: packageManager,
-      args: ['install', '--ignore-scripts'],
+      args: ['install', flag],
       cwd,
-      env: options.env ?? process.env,
+      // Yarn Classic ignores --mode=skip-build if it bypasses the Corepack pin.
+      env: yarnTarballs ? { ...env, YARN_IGNORE_SCRIPTS: 'true' } : env,
       shell: false,
     });
     return true;
   } catch {
     throw new InstallError(
-      `Installation failed. Run ${packageManager} install --ignore-scripts in the project directory.`,
+      `Installation failed. Run ${packageManager} install ${flag} in the project directory.`,
     );
   }
 }

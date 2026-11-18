@@ -7,7 +7,13 @@ import type { Readable, Writable } from 'node:stream';
 import { type Choices, parseArguments, UsageError, usage } from './args.js';
 import { compose, LayerCollisionError, SelectionError } from './compose.js';
 import { GuidanceError, loadGuidanceSource, renderGuidance } from './guidance.js';
-import { detectPackageManager, InstallError, type InstallRunner, install } from './install.js';
+import {
+  detectPackageManager,
+  InstallError,
+  type InstallRunner,
+  install,
+  installFlag,
+} from './install.js';
 import { LayerManifestError, loadLayers } from './layers.js';
 import { MergeConflictError } from './merge.js';
 import { resolveTarballs, TarballError } from './packages.js';
@@ -85,9 +91,13 @@ export async function run(argv: readonly string[], io: IO = {}): Promise<number>
     const target = resolve(io.cwd ?? process.cwd(), directory);
     const name = projectName(target);
     const { packageManager, note } = detectPackageManager(env['npm_config_user_agent']);
-    if (note !== undefined) output.write(`${note}\n`);
     const tarballDirectory = env['GALAXIE_CREATE_PACKAGE_DIR'];
     step = 'resolve local tarballs';
+    if (note !== undefined) {
+      if (tarballDirectory !== undefined)
+        throw new TarballError('Tarball mode requires npm, pnpm or yarn.');
+      output.write(`${note}\n`);
+    }
     const tarballs =
       tarballDirectory === undefined
         ? undefined
@@ -143,6 +153,7 @@ export async function run(argv: readonly string[], io: IO = {}): Promise<number>
       step = 'install project dependencies';
       const installed = await install(packageManager, plan.target, {
         env,
+        tarballMode: tarballs !== undefined,
         ...(io.platform === undefined ? {} : { platform: io.platform }),
         ...(io.runner === undefined ? {} : { runner: io.runner }),
       });
@@ -153,7 +164,7 @@ export async function run(argv: readonly string[], io: IO = {}): Promise<number>
       }
     }
     output.write(
-      `Next: run ${packageManager} install --ignore-scripts, then ${packageManager} run dev in the project directory.\n`,
+      `Next: run ${packageManager} install ${installFlag(packageManager, tarballs !== undefined)}, then ${packageManager} run dev in the project directory.\n`,
     );
     return 0;
   } catch (error) {

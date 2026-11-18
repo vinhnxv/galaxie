@@ -76,6 +76,7 @@ test('only a non-empty documents-only change list skips the create jobs', () => 
     'packages/core/src/index.ts',
     '.github/workflows/ci.yml',
     'scripts/standalone-core.ts',
+    'scripts/verify-standalone.ts',
     'LICENSE',
     'go/go.mod',
     'llms.txt.bak',

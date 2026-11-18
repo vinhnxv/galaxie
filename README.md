@@ -70,7 +70,7 @@ This serves a local English-tutor host with a scripted mock model, so nothing is
 
 The [browser-only starter](templates/kinds/browser-only/files/README.md) has its own tiny agent, uses available Built-in AI or an immediate mock, and loads WebLLM only after a size-disclosed opt-in. The [gateway starter](templates/kinds/gateway/files/README.md) runs the same agent through a same-origin Node gateway with server-held prompts and scoped HTTP capabilities.
 
-Generate either starter from layers with the [create package](packages/create/README.md), prepared for 0.2.0 and not yet published. It supports LangGraph.js, ADK JavaScript, ADK Go and LangGraph Python in both kinds. Repository tarball-mode `create-clean` CI covers all eight combinations on Node 24 and LangGraph.js on Node 22. The pack test inspects thirteen packages, and the isolated packed-create test runs help and a scaffold outside the checkout. [Standalone runs](docs/standalone-verification.md) cover npm tarballs with mocks. Registry installs of 0.2.0, real models, devices, pnpm/yarn tarball mode and non-Linux CI remain unverified.
+Generate either starter from layers with the [create package](packages/create/README.md), prepared for 0.2.0 and not yet published. It supports LangGraph.js, ADK JavaScript, ADK Go and LangGraph Python in both kinds. Repository `create-clean` CI exercises all eight combinations on Node 24 with npm and pnpm, browser-only LangGraph.js with Yarn on Node 24, and LangGraph.js with npm on Node 22. The pack test inspects thirteen packages, and the isolated packed-create test runs help and a scaffold outside the checkout. [Standalone runs](docs/standalone-verification.md) record package-manager coverage with mocks. Registry installs of 0.2.0, real models, devices and non-Linux CI remain unverified.
 
 ## Install in your own app
 
@@ -81,7 +81,7 @@ pnpm add @galaxie-ai/core@0.1.0 @galaxie-ai/adapter-langgraph@0.1.0 @galaxie-ai/
 pnpm add zod @opentelemetry/api react @langchain/core@~1.2.20 @langchain/langgraph@~1.5.1 @langchain/langgraph-checkpoint@~1.2.0
 ```
 
-After the maintainer publishes 0.2.0, upgrade all `@galaxie-ai/*` pins together; 0.x minor releases may change APIs. Generated projects use `^0.2.0` caret ranges and currently require local npm tarballs.
+After the maintainer publishes 0.2.0, upgrade all `@galaxie-ai/*` pins together; 0.x minor releases may change APIs. Generated projects use `^0.2.0` caret ranges and currently require local tarballs.
 
 `@galaxie-ai/ui-protocol` and `@galaxie-ai/adapter-kit` arrive as dependencies. `@galaxie-ai/models` has no root export: import a provider subpath such as `@galaxie-ai/models/webllm`, and install only the provider libraries you use, which are optional peers (`@mlc-ai/web-llm`, `@huggingface/transformers` with `@huggingface/transformers-structured-output`, and `@langchain/openai`). Each package README lists its peers and exact ranges.
 

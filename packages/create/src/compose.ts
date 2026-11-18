@@ -4,7 +4,13 @@
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import type { Layer } from './layers.js';
 import { isObject, type JsonObject, mergeFragments } from './merge.js';
-import { type PackageManager, requiredPackages, TarballError, type Tarballs } from './packages.js';
+import {
+  type PackageManager,
+  requiredPackages,
+  TarballError,
+  type Tarballs,
+  tarballYarnPin,
+} from './packages.js';
 import { validateOutputPath, validateProjectName } from './paths.js';
 
 export interface ProjectFile {
@@ -157,17 +163,20 @@ export function compose(layers: readonly Layer[], options: ComposeOptions): Comp
     selected.map((layer) => ({ layer: layer.manifest.id, value: layer.manifest.package })),
   );
   manifest['name'] = options.name;
+  const tarballOverrides: Record<string, string> = {};
   if (options.tarballs !== undefined) {
-    if (options.packageManager !== 'npm')
-      throw new TarballError(
-        'Tarball mode supports npm only; pnpm and yarn tarball installs are not proven.',
-      );
-    const overrides: JsonObject = {};
     for (const name of requiredPackages(options.framework)) {
       const path = options.tarballs.get(name);
       if (path === undefined || !isAbsolute(path))
         throw new TarballError(`Expected an absolute tarball path for ${name}.`);
-      overrides[name] = `file:${path}`;
+      // Yarn reserves these delimiters inside file: locators, and it cannot read a path with a query mark.
+      if (options.packageManager === 'yarn' && path.includes('?'))
+        throw new TarballError(
+          'Yarn cannot install from a tarball path that contains a question mark; move the tarballs to another directory.',
+        );
+      const reference =
+        options.packageManager === 'yarn' ? path.replace(/%|#|::/g, encodeURIComponent) : path;
+      tarballOverrides[name] = `file:${reference}`;
     }
     for (const section of [
       'dependencies',
@@ -179,18 +188,35 @@ export function compose(layers: readonly Layer[], options: ComposeOptions): Comp
       if (!isObject(dependencies)) continue;
       for (const name of Object.keys(dependencies))
         if (name.startsWith('@galaxie-ai/')) {
-          if (!Object.hasOwn(overrides, name))
+          const spec = tarballOverrides[name];
+          if (spec === undefined)
             throw new TarballError('The layer names an unknown galaxie package.');
-          dependencies[name] = overrides[name] as string;
+          dependencies[name] = spec;
         }
     }
-    manifest['overrides'] = mergeFragments(
-      [
-        { layer: 'layers', value: isObject(manifest['overrides']) ? manifest['overrides'] : {} },
-        { layer: 'tarballs', value: overrides },
-      ],
-      'package.json.overrides',
-    );
+    if (options.packageManager === 'yarn') {
+      manifest['packageManager'] = tarballYarnPin;
+      // Yarn does not auto-install missing peers at the project root.
+      const dependencies = manifest['dependencies'];
+      if (isObject(dependencies)) {
+        if (Object.hasOwn(dependencies, '@galaxie-ai/core'))
+          dependencies['@opentelemetry/api'] ??= '1.10.0';
+        if (Object.hasOwn(dependencies, '@galaxie-ai/storage-indexeddb'))
+          dependencies['@langchain/langgraph-checkpoint'] ??= '1.2.2';
+      }
+      add('.yarnrc.yml', Buffer.from('nodeLinker: node-modules\n'), 'composer');
+    }
+    if (options.packageManager !== 'pnpm') {
+      const field = options.packageManager === 'npm' ? 'overrides' : 'resolutions';
+      const existing = manifest[field];
+      manifest[field] = mergeFragments(
+        [
+          { layer: 'layers', value: isObject(existing) ? existing : {} },
+          { layer: 'tarballs', value: tarballOverrides },
+        ],
+        `package.json.${field}`,
+      );
+    }
   }
   const allowBuilds = mergeFragments(
     selected.map((layer) => ({
@@ -199,14 +225,20 @@ export function compose(layers: readonly Layer[], options: ComposeOptions): Comp
     })),
     'pnpm.allowBuilds',
   );
-  if (options.packageManager === 'pnpm' && Object.keys(allowBuilds).length > 0) {
-    const rows = Object.keys(allowBuilds)
+  if (options.packageManager === 'pnpm') {
+    const buildRows = Object.keys(allowBuilds)
       .sort()
       .map(
         (name) =>
           `  ${/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name) && !/^(?:null|true|false|yes|no|on|off|y|n)$/i.test(name) ? name : `'${name.replaceAll("'", "''")}'`}: ${String(allowBuilds[name])}`,
       );
-    add('pnpm-workspace.yaml', Buffer.from(`allowBuilds:\n${rows.join('\n')}\n`), 'composer');
+    const overrideRows = Object.keys(tarballOverrides)
+      .sort()
+      .map((name) => `  ${JSON.stringify(name)}: ${JSON.stringify(tarballOverrides[name])}`);
+    const yaml =
+      (buildRows.length > 0 ? `allowBuilds:\n${buildRows.join('\n')}\n` : '') +
+      (overrideRows.length > 0 ? `overrides:\n${overrideRows.join('\n')}\n` : '');
+    if (yaml !== '') add('pnpm-workspace.yaml', Buffer.from(yaml), 'composer');
   }
   add('package.json', jsonBytes(orderedPackage(manifest)), 'composer');
   if (options.mode === 'workspace-test') {

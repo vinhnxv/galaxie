@@ -14,9 +14,9 @@ evidence, with the maintainer's Go decision (2026-10-30) recorded and its open i
 
 Thirteen packages are prepared for the 0.2.0 lockstep release, not yet published.
 The seven launch packages remain on npm at 0.1.0; historical registry results do
-not verify 0.2.0. Repository `create-clean` CI and local standalone runs use npm
-tarballs and mocks. pnpm/yarn tarball mode, devices, real models and non-Linux CI
-remain unverified by this preparation. Direct registry consumers of
+not verify 0.2.0. Repository `create-clean` CI and local standalone runs use tarballs and mocks.
+The verification record lists npm, pnpm and Yarn coverage. Devices, real models
+and non-Linux CI remain unverified. Direct registry consumers of
 `adapter-pyodide` must arrange hosting for the vendored cryptography wheel's
 repository-relative URL; generated LangGraph Python projects obtain their wheel
 set from `starter-python` instead. The whole release waits for the maintainer's

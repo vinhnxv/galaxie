@@ -261,7 +261,7 @@ test('malformed JSON and invalid manifest values never leak the document text', 
   }
 });
 
-test('npm tarball composition rewrites direct dependencies and overrides, and other managers refuse it', () => {
+test('npm tarball composition rewrites direct dependencies and overrides', () => {
   const layers = basic();
   layers[0]!.manifest.package = { dependencies: { '@galaxie-ai/core': '^0.1.0', react: '19.3.1' } };
   const tarballs = new Map([
@@ -288,10 +288,39 @@ test('npm tarball composition rewrites direct dependencies and overrides, and ot
     '@galaxie-ai/storage-indexeddb': 'file:/packed/galaxie-ai-storage-indexeddb-0.1.0.tgz',
     '@galaxie-ai/react': 'file:/packed/galaxie-ai-react-0.1.0.tgz',
   });
-  for (const packageManager of ['pnpm', 'yarn'] as const)
-    expect(() => compose(layers, { ...options, tarballs, packageManager })).toThrow(
-      'Tarball mode supports npm only',
-    );
+});
+
+test('pnpm tarball overrides share the workspace file with existing build decisions', () => {
+  const layers = basic();
+  layers[0]!.manifest.pnpm = { allowBuilds: { protobufjs: false } };
+  const tarballs = new Map([
+    ['@galaxie-ai/ui-protocol', '/packed/ui-protocol.tgz'],
+    ['@galaxie-ai/core', '/packed/core # "quoted".tgz'],
+    ['@galaxie-ai/adapter-kit', '/packed/adapter-kit.tgz'],
+    ['@galaxie-ai/adapter-langgraph', '/packed/adapter-langgraph.tgz'],
+    ['@galaxie-ai/models', '/packed/models.tgz'],
+    ['@galaxie-ai/storage-indexeddb', '/packed/storage-indexeddb.tgz'],
+    ['@galaxie-ai/react', '/packed/react.tgz'],
+  ]);
+  const { files } = compose(layers, { ...options, tarballs, packageManager: 'pnpm' });
+  expect(Buffer.from(files.get('pnpm-workspace.yaml')!.bytes).toString()).toBe(
+    [
+      'allowBuilds:',
+      '  protobufjs: false',
+      'overrides:',
+      '  "@galaxie-ai/adapter-kit": "file:/packed/adapter-kit.tgz"',
+      '  "@galaxie-ai/adapter-langgraph": "file:/packed/adapter-langgraph.tgz"',
+      '  "@galaxie-ai/core": "file:/packed/core # \\"quoted\\".tgz"',
+      '  "@galaxie-ai/models": "file:/packed/models.tgz"',
+      '  "@galaxie-ai/react": "file:/packed/react.tgz"',
+      '  "@galaxie-ai/storage-indexeddb": "file:/packed/storage-indexeddb.tgz"',
+      '  "@galaxie-ai/ui-protocol": "file:/packed/ui-protocol.tgz"',
+      '',
+    ].join('\n'),
+  );
+  expect(Buffer.from(files.get('package.json')!.bytes).toString()).toBe(
+    '{\n  "name": "my-app"\n}\n',
+  );
 });
 
 test('pnpm build decision keys that YAML would read as non-strings are quoted', () => {
@@ -384,3 +413,19 @@ test.each(['browser-only', 'gateway'])(
     );
   },
 );
+
+test('yarn tarball mode refuses a path with a question mark before composing', () => {
+  const tarballs = new Map([
+    ['@galaxie-ai/ui-protocol', '/packed/ui-protocol.tgz'],
+    ['@galaxie-ai/core', '/packed?dir/core.tgz'],
+    ['@galaxie-ai/adapter-kit', '/packed/adapter-kit.tgz'],
+    ['@galaxie-ai/adapter-langgraph', '/packed/adapter-langgraph.tgz'],
+    ['@galaxie-ai/models', '/packed/models.tgz'],
+    ['@galaxie-ai/storage-indexeddb', '/packed/storage-indexeddb.tgz'],
+    ['@galaxie-ai/react', '/packed/react.tgz'],
+  ]);
+  expect(() => compose(basic(), { ...options, tarballs, packageManager: 'yarn' })).toThrow(
+    'question mark',
+  );
+  expect(() => compose(basic(), { ...options, tarballs, packageManager: 'pnpm' })).not.toThrow();
+});

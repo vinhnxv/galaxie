@@ -38,14 +38,27 @@ test('create-clean is scoped, bounded and uses pinned external actions', () => {
   expect(block).toContain('browser: "true"');
 });
 
-test('create-clean has four Node 24 frameworks and a separate LangGraph Node 22 leg', () => {
+test('create-clean measures npm and pnpm in all eight Node 24 projects and Yarn in one', () => {
   const block = job('create-clean');
   expect(block).toContain('fail-fast: false');
-  expect(block).toContain('name: create-clean (${{ matrix.framework }} node ${{ matrix.node }})');
+  expect(block).toContain(
+    'name: create-clean (${{ matrix.framework }} node ${{ matrix.node }} ${{ matrix.manager }})',
+  );
   const frameworks = /framework: \[([^\]]+)\]/.exec(block)?.[1]?.split(/,\s*/);
   expect(frameworks).toEqual(['langgraph-js', 'adk-js', 'adk-go', 'langgraph-python']);
   expect(block).toMatch(/^ {8}node: \[24\]$/m);
-  expect(block).toMatch(/^ {8}include:\n {10}- framework: langgraph-js\n {12}node: 22\n {4}name:/m);
+  expect(block).toMatch(/^ {8}manager: \[npm, pnpm\]$/m);
+  expect(block).toMatch(/^ {8}kind: \[all\]$/m);
+  expect(block).toContain(`        include:
+          - framework: langgraph-js
+            node: 22
+            manager: npm
+            kind: all
+          - framework: langgraph-js
+            node: 24
+            manager: yarn
+            kind: browser-only
+    name:`);
 });
 
 test('create-clean captures Node 22 and provisions npm after restoring the repository Node', () => {
@@ -59,6 +72,13 @@ test('create-clean captures Node 22 and provisions npm after restoring the repos
   expect(restore).toBeGreaterThan(capture);
   expect(npm).toBeGreaterThan(restore);
   expect(block).toContain('test "$(npm --version)" = "12.2.2"');
+  expect(block).toContain(`      - name: Install npm with release-age enforcement
+        if: matrix.manager == 'npm'`);
+  expect(block).toContain(`      - name: Install Corepack for pinned pnpm and Yarn
+        if: matrix.manager != 'npm'
+        run: |
+          npm install -g corepack@0.34.6 --ignore-scripts
+          test "$(corepack --version)" = "0.34.6"`);
   expect(block).toContain('NODE_22: ${{ steps.node22.outputs.path }}');
   expect(block).toContain('args+=(--node "22=$NODE_22")');
 });
@@ -73,11 +93,16 @@ test('create-clean warms framework artifacts and runs both kinds with a clean PA
   );
   expect(block).toContain('pnpm exec tsc -p packages/create/tsconfig.build.json');
   expect(block).toContain('node scripts/verify-standalone.ts');
-  expect(block).toContain('--framework "$FRAMEWORK" --kind all --mode tarball');
+  expect(block).toContain(
+    '--framework "$FRAMEWORK" --kind "$KIND" --mode tarball --package-manager "$MANAGER"',
+  );
+  expect(block).toContain('--server-budget-minutes 2');
   expect(block).toContain(
     '--clean-path --budget-minutes 10 --json "$RUNNER_TEMP/create-clean.json"',
   );
   expect(block).toContain('FRAMEWORK: ${{ matrix.framework }}');
+  expect(block).toContain('KIND: ${{ matrix.kind }}');
+  expect(block).toContain('MANAGER: ${{ matrix.manager }}');
 });
 
 test('create-clean always logs JSON and writes per-project durations without another action', () => {
@@ -85,7 +110,10 @@ test('create-clean always logs JSON and writes per-project durations without ano
   const summary = block.slice(block.indexOf('if: always()'));
   expect(summary).toContain('cat "$RUNNER_TEMP/create-clean.json"');
   expect(summary).toContain('GITHUB_STEP_SUMMARY');
-  expect(summary).toContain('durationMs');
+  expect(summary).toContain('| Project | Node | Package manager | durationMs | serverDurationMs |');
+  expect(summary).toContain('| --- | --- | --- | ---: | ---: |');
+  expect(summary).toContain('${result.durationMs}');
+  expect(summary).toContain("${result.serverDurationMs ?? '—'}");
   expect(summary).toContain('JSON.parse');
   expect(summary).not.toContain('uses:');
 });

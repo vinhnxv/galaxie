@@ -85,23 +85,24 @@ Firefox/WebKit measurement was run. Nothing is published; the package stays at
 
 ## Clean-environment CI
 
-The `create-clean` job in `.github/workflows/ci.yml` runs the existing harness
-with npm 12.2.2, locally packed tarballs, `--kind all`, `--clean-path` and
-`--budget-minutes 10` on Ubuntu 24.04. Four Node 24 legs cover `langgraph-js`,
-`adk-js`, `adk-go` and `langgraph-python`: all eight kind/framework combinations.
-A fifth leg repeats both LangGraph JavaScript kinds on Node 22. Preparation and
-packing use the full PATH, including Go or the prepared Python wheel cache where
-needed; generated projects are outside the checkout and use the requested Node.
-Nothing is published.
+The `create-clean` job in `.github/workflows/ci.yml` uses locally packed
+tarballs, `--clean-path`, `--budget-minutes 10` and `--server-budget-minutes 2`
+on Ubuntu 24.04. npm 12.2.2 and pnpm 11.21.0 each cover all eight Node 24
+kind/framework combinations. npm also covers both LangGraph.js kinds on Node 22.
+Yarn 4.18.1 covers browser-only LangGraph.js on Node 24. Preparation and packing
+use the full PATH, including Go or the prepared Python wheel cache where needed.
+Generated projects are outside the checkout and use the requested Node.
 
 Every generated-project process, including scaffold, install, build, check,
 negative controls, server compilation, preview and gateway servers, receives a
 PATH containing only an owned scratch directory with symlinks to `node` and `sh`.
-npm's resolved CLI is invoked explicitly through the requested Node binary.
+The requested Node binary invokes npm's resolved CLI or Corepack with the pinned
+pnpm or Yarn version. pnpm uses symlinked package executables for the clean PATH
+because its shell wrappers require additional system utilities.
 Before scaffolding, the harness checks that `go`, `python`, `python3` and `uv`
 cannot be found, then probes each through a child Node process and requires
 `ENOENT`. The Chromium driver runs in the harness process, outside this PATH
-restriction. `sh` is required by npm's script runner; no inherited system-tool
+restriction. `sh` is required by the generated scripts; no inherited system-tool
 directory is admitted.
 
 Each result records `durationMs` from the start of scaffold to the preview mock
@@ -120,13 +121,14 @@ started. Cleanup is outside this interval. `--server-budget-minutes` accepts
 integers from 1 to 60 and defaults to 2. A leg longer than the allowance adds a gating `budget` failure
 with `server budget exceeded: <measured> ms of <allowed> ms`. Both elapsed-time
 gates are evaluated after the project run. Each CI leg also has a 45-minute job
-timeout. JSON results are printed to the job log, and scaffold-to-preview
-durations are written to the job summary.
+timeout. The job logs the JSON results and writes the package-manager version and
+both durations to the job summary. The server column uses a dash when the
+compiled-server leg did not start.
 
 The scope output skips this job only for a non-empty documents-only change list
 (Markdown, paths under `docs/`, or `llms.txt`); other changes and unknown/empty
-lists run it. The final `ci` gate depends on `create-clean`. Acceptance of the
-first PR run requires all five legs to conclude `success`, not `skipped`.
+lists run it. The final `ci` gate depends on all ten matrix jobs through
+`create-clean`.
 
 Local measurements on macOS (2026-11-17), with the clean PATH asserted, reached the
 mock answer within the budget:
@@ -151,12 +153,39 @@ These are one cold run each on GitHub-hosted runners. They exclude packing and s
 artifact preparation, and for the gateway kind they stop at the preview mock answer,
 before the compiled server leg. They are a single observation, not a distribution.
 
-Unmeasured by this clean-environment matrix: pnpm and yarn installs, registry
-mode and the scheduled registry run, Windows, macOS CI, Node versions other than
-22 and 24, and real model providers. Tarball mode refuses pnpm and yarn before
-any write; registry CI and its schedule are deferred until 0.2.0 is published
-for this workflow. Earlier manual registry records below are separate
-evidence. The other limits in [Unmeasured](#unmeasured) still apply.
+### pnpm and Yarn tarball measurements (2026-11-18)
+
+Local macOS arm64 runs used Node 24.15.0, Corepack 0.34.6, prepacked workspace
+tarballs and the asserted clean PATH. Each row reached the scripted mock answer.
+Gateway rows also passed the compiled-server session probe and gave the expected
+HTTP 503 without an upstream. Durations are in milliseconds.
+
+| Package manager | Framework | Browser-only preview | Gateway preview | Gateway server |
+| --- | --- | ---: | ---: | ---: |
+| pnpm 11.21.0 | langgraph-js | 9,063 | 6,120 | 524 |
+| pnpm 11.21.0 | adk-js | 10,673 | 6,746 | 575 |
+| pnpm 11.21.0 | adk-go | 9,511 | 6,334 | 718 |
+| pnpm 11.21.0 | langgraph-python | 11,812 | 8,849 | 3,333 |
+| Yarn 4.18.1 | langgraph-js | 13,683 | — | — |
+
+An earlier Linux run of the new jobs on this branch used Ubuntu 24.04 and
+Node 24.22.2. The run as a whole was cancelled after all ten `create-clean`
+jobs had passed, and the later run of the final head also passed all ten. The
+table records that earlier run's pnpm and Yarn job-log results in milliseconds,
+one observation each. [Workflow run](https://github.com/vinhnxv/galaxie/actions/runs/44282461508)
+
+| Package manager | Framework | Browser-only preview | Gateway preview | Gateway server |
+| --- | --- | ---: | ---: | ---: |
+| pnpm 11.21.0 | langgraph-js | 12,418 | 7,936 | 673 |
+| pnpm 11.21.0 | adk-js | 14,613 | 8,361 | 759 |
+| pnpm 11.21.0 | adk-go | 11,532 | 9,065 | 942 |
+| pnpm 11.21.0 | langgraph-python | 18,644 | 13,370 | 6,039 |
+| Yarn 4.18.1 | langgraph-js | 17,088 | — | — |
+
+Registry mode, the scheduled registry run, Windows, macOS CI, Node versions
+outside 22 and 24, pnpm and Yarn on Node 22, Yarn gateway and Yarn on the other
+frameworks remain unmeasured by this matrix. Earlier registry results cover
+older versions. See [Unmeasured](#unmeasured) for other limits.
 
 With `--framework adk-go --mode tarball --clean-path`, the harness also checks
 the no-Go edited-source refusal. After the normal build, it appends a comment to
@@ -473,7 +502,8 @@ ADR-0031 stays Proposed. ADR-0012 guarantees are unchanged.
 ## Reproduce the measurement
 
 From the repository root, use Node 24, the installed pnpm 11 workspace tooling,
-npm 12 on PATH and repository Playwright Chromium. Install a target Node locally
+npm 12 or Corepack 0.34.6 on PATH for the selected package manager, and repository
+Playwright Chromium. Install a target Node locally
 with `nvm install 22` when absent; the harness never downloads Node. No Docker,
 provider credential or upstream is needed.
 
@@ -487,7 +517,9 @@ node scripts/verify-standalone.ts --node 22 --node 24 --mode tarball --json /tmp
 
 `--kind browser-only|gateway|all` selects kinds. `--framework langgraph-js|adk-js|adk-go|langgraph-python`
 selects the framework (default `langgraph-js`); ADK and LangGraph Python require `--mode tarball`.
-ADK Go and LangGraph Python support both kinds.
+ADK Go and LangGraph Python support both kinds. `--package-manager npm|pnpm|yarn`
+defaults to npm. pnpm and Yarn require tarball mode and Corepack. The harness
+uses the workspace pin for pnpm and pins Yarn 4.18.1.
 The old `--template` flag is rejected. `--node` is repeatable;
 `--node 22=/absolute/path/to/node` overrides discovery. Otherwise the current
 runtime wins for its major, then the newest matching nvm installation.
@@ -509,11 +541,17 @@ on PATH and invokes starter-go prepack to produce its complete dist. It uses
 the harness Node 24 and pnpm for packing, independently of the target Node. Every
 generated project's scaffold, install, build, check, preview and server compile/run uses the requested
 Node binary. npm's resolved `npm-cli.js` is invoked by that binary explicitly;
-Node 22's bundled npm is not used. All direct galaxie dependencies and all seven
-transitive overrides point to the owned tarballs. The lockfile check requires one
+Node 22's bundled npm is not used. All direct galaxie dependencies and transitive
+overrides point to the owned tarballs. The lockfile check requires one
 file-resolved copy of each reachable galaxie package and rejects duplicates,
 registry resolutions, missing required packages and unexpected galaxie packages.
-Browser-only reaches seven launch packages; gateway reaches six (no storage package).
+pnpm verifies each local path, the full archive SHA-512 in `pnpm-lock.yaml` and
+one matching snapshot per package. Yarn verifies the local path and the short
+archive fingerprint in `yarn.lock`. Yarn's full checksum is for its converted
+cache archive. The immutable `--check-cache` install refetches and checks that
+checksum. The offline lockfile inspection alone does not verify the full raw
+Yarn tarball SHA-512. Browser-only reaches seven launch packages and gateway
+reaches six for LangGraph.js.
 
 The scaffold hook runs the built CLI with a relative target, selected kind/framework
 and `--no-install`. In tarball mode it receives the owned tarball directory through
@@ -524,8 +562,12 @@ live outside the repository. `assertCopy` rejects workspace artifacts such as
 Child environment names
 are allowlisted, with empty owned npm user/global configuration and a fresh owned
 cache. Upstream variables, authentication variables and `NODE_OPTIONS` do not pass
-through. The public registry and seven-day release age are explicit; npm 12 and
-its effective `min-release-age` are checked before installing. The harness never
+through. The public registry and the seven-day release age are explicit. npm 12
+uses `min-release-age` in days. pnpm uses the workspace's exact minute value in
+`pnpm-workspace.yaml`, strict mode and required registry time metadata. Yarn sets
+`npmMinimalAgeGate` in `.yarnrc.yml` and uses an isolated HOME, as does pnpm. The
+harness reads each effective policy before installing. The release-age exclusion
+option applies only to npm. The harness never
 publishes or edits user npm configuration. Cleanup stops child process groups and
 removes the owned root on normal exit, failure and handled SIGINT/SIGTERM; SIGKILL
 and machine crashes cannot run cleanup. All servers bind to `127.0.0.1`, with
@@ -543,7 +585,7 @@ the same question flow but requires the observed model HTTP 503 and
 also receive a separate `POST /api/session` probe expecting HTTP 200; its response
 body is cancelled without parsing, printing or recording it.
 
-Every generated project must pass `npm run check` after the build. This includes
+Every generated project must pass `<package-manager> run check` after the build. This includes
 client/check TypeScript compilation, exact Vite CSP and Trusted Types assertions,
 and the gateway's compiled static-handler header, transitive production import
 boundary, absence of compiled dev/mock files and imports, and authenticated
@@ -551,15 +593,14 @@ production 503 without an upstream. The harness then separately adds
 `'unsafe-inline'` to `script-src` and empties `require-trusted-types-for`, reruns the
 check, and requires a rejection naming the changed directive. A check that passes
 or fails for an unrelated reason makes the negative-control phase fail. The CSP
-source is restored in `finally` after each mutation. Installs use
-`npm install --ignore-scripts --no-audit --no-fund`; no fallback to lifecycle
-scripts was needed in the measured matrix.
+source is restored in `finally` after each mutation. npm installs with
+`--ignore-scripts --no-audit --no-fund`. pnpm uses `--ignore-scripts` for both
+the fresh install and frozen offline replay. Yarn uses `--mode=skip-build` for
+the fresh install and immutable cache verification.
 
-Tarball mode supports npm only. pnpm and yarn are refused by the create CLI until
-follow-up work proves their installs and override locations. The create
-package is outside this harness's seven-package base inventory; its isolated
-packed-create conformance test verifies its tarball separately. This harness
-never publishes packages or creates tags.
+The create package is outside this harness's base pack inventory. The
+isolated packed-create conformance test verifies its tarball separately. This
+harness never publishes packages or creates tags.
 
 ## Previous copied-starter environment and final matrix
 
@@ -605,14 +646,14 @@ and wiring result, not a model-quality or device-performance measurement.
 ## Failure records and offline proof
 
 The JSON output is an array of results: `template`, verified `node` (or the requested
-major if version resolution fails), exact `npm` (or `unknown` before its probe),
-`mode`, `releaseAgeDays`, `exclude`, `browser`, `durationMs`, `serverDurationMs`
-and `failures`. Each failure contains
+major if version resolution fails), `packageManager`, exact `packageManagerVersion`
+(or `unknown` before its probe), `mode`, `releaseAgeDays`, `exclude`, `browser`, `durationMs`, `serverDurationMs`
+and `failures`. npm results also retain the `npm` version field. Each failure contains
 `phase`, `gating`, `source`, `suggested`, `summary` and `excerpt`; the parent result
 supplies the combination/node/mode identity. Current phases are node, pack,
 scaffold, install, build, check, negative-control, compile, serve, drive, probe and budget.
 All current failures are gating; the earlier advisory source check has been
-replaced by `npm run check`. Suggested sources are template, `package:<name>`, environment,
+replaced by the generated project's `check` script. Suggested sources are template, `package:<name>`, environment,
 harness or unclassified; triage must confirm them. Excerpts replace the temporary
 root, HOME, URLs and credential-like fields and are capped at 16 lines/4000
 characters. Any gating or unclassified failure causes exit 1; usage errors exit 2.
@@ -659,8 +700,8 @@ core's main entry and its runtime Zod boundary are unchanged.
 ## Unmeasured
 
 Real Built-in AI, real WebGPU devices, WebLLM/model downloads, real upstream
-inference, pnpm/yarn harness installs, the pnpm 11 override location, bundled npm 10 versus
-npm 12, Windows automatic install and operation, answer
+inference, Bun installs, bundled npm 10 versus npm 12, Windows automatic
+install and operation, answer
 quality, latency and memory are not covered. No live service, real user data,
 backend authorization audit, broad packaging/API compatibility claim or ADR
 acceptance is implied. ADR-0031 stays Proposed; ADR-0012 guarantees are unchanged.

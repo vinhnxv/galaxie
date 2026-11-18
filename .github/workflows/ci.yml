@@ -273,10 +273,18 @@ jobs:
       matrix:
         framework: [langgraph-js, adk-js, adk-go, langgraph-python]
         node: [24]
+        manager: [npm, pnpm]
+        kind: [all]
         include:
           - framework: langgraph-js
             node: 22
-    name: create-clean (${{ matrix.framework }} node ${{ matrix.node }})
+            manager: npm
+            kind: all
+          - framework: langgraph-js
+            node: 24
+            manager: yarn
+            kind: browser-only
+    name: create-clean (${{ matrix.framework }} node ${{ matrix.node }} ${{ matrix.manager }})
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -301,9 +309,15 @@ jobs:
         with:
           node-version-file: .nvmrc
       - name: Install npm with release-age enforcement
+        if: matrix.manager == 'npm'
         run: |
           npm install -g npm@12.2.2
           test "$(npm --version)" = "12.2.2"
+      - name: Install Corepack for pinned pnpm and Yarn
+        if: matrix.manager != 'npm'
+        run: |
+          npm install -g corepack@0.34.6 --ignore-scripts
+          test "$(corepack --version)" = "0.34.6"
       # Warm the artifacts before packing: the harness bounds each pack command to 300 seconds.
       - name: Prepare the Go starter artifact
         if: matrix.framework == 'adk-go'
@@ -318,9 +332,11 @@ jobs:
           pnpm --filter @galaxie-ai/starter-python run prepack
       - name: Build the create CLI
         run: pnpm exec tsc -p packages/create/tsconfig.build.json
-      - name: Verify both generated kinds in a clean environment
+      - name: Verify generated projects in a clean environment
         env:
           FRAMEWORK: ${{ matrix.framework }}
+          KIND: ${{ matrix.kind }}
+          MANAGER: ${{ matrix.manager }}
           TARGET_NODE: ${{ matrix.node }}
           NODE_22: ${{ steps.node22.outputs.path }}
         run: |
@@ -329,7 +345,8 @@ jobs:
             args+=(--node "22=$NODE_22")
           fi
           node scripts/verify-standalone.ts "${args[@]}" \
-            --framework "$FRAMEWORK" --kind all --mode tarball \
+            --framework "$FRAMEWORK" --kind "$KIND" --mode tarball --package-manager "$MANAGER" \
+            --server-budget-minutes 2 \
             --clean-path --budget-minutes 10 --json "$RUNNER_TEMP/create-clean.json"
       - name: Report the clean-environment results and durations
         if: always()
@@ -342,10 +359,10 @@ jobs:
           node --input-type=module <<'NODE'
           import { appendFileSync, readFileSync } from 'node:fs';
           const results = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/create-clean.json`, 'utf8'));
-          const lines = results.map((result) => `| ${result.template} | ${result.node} | ${result.durationMs} |`);
+          const lines = results.map((result) => `| ${result.template} | ${result.node} | ${result.packageManager} ${result.packageManagerVersion} | ${result.durationMs} | ${result.serverDurationMs ?? '—'} |`);
           appendFileSync(process.env.GITHUB_STEP_SUMMARY, [
-            '| Project | Node | durationMs |',
-            '| --- | --- | --- |',
+            '| Project | Node | Package manager | durationMs | serverDurationMs |',
+            '| --- | --- | --- | ---: | ---: |',
             ...lines,
             '',
           ].join('\n'));
