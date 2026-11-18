@@ -75,8 +75,9 @@ Use a host-owned finite aggregation allowlist before treating any of these as
 metric labels; do not promote arbitrary observed values to labels.
 
 `galaxie.model.provider` comes from the host-owned set of provider IDs in its
-model configuration. galaxie does not prescribe that set or bound its size;
-the host decides which IDs, if any, are aggregation labels.
+model configuration, the key of its `models.providers` map. Each ID is 1 to 64
+characters from `[A-Za-z0-9._-]`; galaxie does not limit how many IDs a host
+defines, and the host decides which IDs, if any, are aggregation labels.
 
 The runtime supplies bounded vocabularies for `gen_ai.operation.name`,
 `galaxie.capability.kind`, `galaxie.destination.class`, `galaxie.output_safety`,

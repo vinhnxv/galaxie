@@ -534,7 +534,11 @@ test.each([
   writeFileSync(join(root, tracingSourceFile), `${source}\nfunction bypass(): void { ${write} }\n`);
   const result = run(root);
   expect(result.status).toBe(1);
-  expect(result.output).toContain('literal tracing write outside attributes()/text():');
+  expect(result.output).toMatch(
+    new RegExp(
+      `literal tracing write outside attributes\\(\\)/text\\(\\) at tracing\\.ts:${source.split('\n').length + 1}:`,
+    ),
+  );
 });
 
 test('accepts tracing writes routed through the metadata and text helpers', () => {

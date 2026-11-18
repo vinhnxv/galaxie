@@ -132,6 +132,8 @@ interface Script {
   parallel: boolean;
   fail: boolean;
   beforeFailure: Promise<void>;
+  /** When set, the sibling's model reply waits until write 1 has been dispatched. */
+  firstWrite?: Promise<void>;
   requests: Request[];
   sibling?: {
     started: ReturnType<typeof Promise.withResolvers<void>>;
@@ -170,6 +172,11 @@ class StageModel extends BaseChatModel {
         // A sibling call that is emitted but not yet dispatched is not covered here.
         await sibling.release.promise;
       } else sibling.release.resolve();
+    }
+    if (name === 'c' && !afterTool && this.script.firstWrite) {
+      // The sibling must reach the shared tool lock after write 1: the lock is held across the
+      // sibling's approval, so the other order would leave write 1 undispatched forever.
+      await this.script.firstWrite;
     }
     if (name === 'b' && afterTool && this.script.fail) {
       this.script.fail = false;
@@ -253,6 +260,7 @@ async function runWorkflowReplacement({
   const heldWrite = Promise.withResolvers<void>();
   const writeStarted = Promise.withResolvers<void>();
   const approvalQueued = Promise.withResolvers<void>();
+  const firstWriteDispatched = Promise.withResolvers<void>();
   let heldConfirmation: ConfirmationId | undefined;
   let approvalAttempt = 0;
   const approvedWrites: { attempt: number; value: unknown }[] = [];
@@ -274,6 +282,7 @@ async function runWorkflowReplacement({
           ? writeStarted.promise
           : recovery.receipts.promise,
     ...(cancelSibling ? { sibling } : {}),
+    ...(holdApproval ? { firstWrite: firstWriteDispatched.promise } : {}),
   };
   const model = new StageModel(script);
   const invoked: number[] = [];
@@ -335,6 +344,7 @@ async function runWorkflowReplacement({
             retry: 'none',
             async invoke(input: { value: number }, context: CapabilityContext) {
               invoked.push(input.value);
+              if (input.value === 1) firstWriteDispatched.resolve();
               invocationRuns.push(context.runId);
               if (holdWrite && input.value === 2) {
                 writeStarted.resolve();

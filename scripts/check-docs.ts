@@ -352,7 +352,9 @@ function tracingKeys(source: string): Set<string> {
           ts.isObjectLiteralExpression(argument) &&
           hasLiteralKey(argument))
       )
-        throw new Error(`literal tracing write outside attributes()/text(): ${node.getText(tree)}`);
+        throw new Error(
+          `literal tracing write outside attributes()/text() at tracing.ts:${tree.getLineAndCharacterOfPosition(node.getStart(tree)).line + 1}: ${node.getText(tree)}`,
+        );
     }
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
       const name = node.name.text;
