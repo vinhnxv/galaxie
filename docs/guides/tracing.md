@@ -28,6 +28,10 @@ Nodes and capabilities use `INTERNAL` spans; model calls use `CLIENT` spans.
 Each pause closes its segment with `waiting_input`; a resume opens a new root
 with the same run ID and an incremented `galaxie.run.segment` starting from zero.
 
+The Proposed decisions for [development text on root spans](../adr/0032-development-text-on-agent-root-spans.md)
+and [LangGraph Python and ADK Go span coverage](../adr/0033-brokered-node-and-model-spans.md)
+describe follow-up implementation.
+
 The source records the GenAI convention pin as
 `open-telemetry/semantic-conventions-genai@51a0f580f8a6ad804ca4de5e033683c6fbbe5906`,
 schema URL `https://opentelemetry.io/schemas/gen-ai-dev/1.42.0-dev`, with core

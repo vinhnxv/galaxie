@@ -52,6 +52,8 @@ Each ADR records one decision for galaxie: the context, the decision, the altern
 | [0029](0029-reconcile-hook-for-unknown-outcome-writes.md) | Optional reconcile hook for unknown-outcome writes | Proposed |
 | [0030](0030-several-engine-pauses-published-one-at-a-time.md) | Several engine pauses published one at a time | Accepted |
 | [0031](0031-declarative-host-configuration.md) | Declarative host configuration for agent wiring | Proposed |
+| [0032](0032-development-text-on-agent-root-spans.md) | Development text on agent root spans | Proposed |
+| [0033](0033-brokered-node-and-model-spans.md) | Node and model spans at brokered executor boundaries | Proposed |
 
 ## Template
 
