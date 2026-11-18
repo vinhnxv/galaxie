@@ -37,6 +37,15 @@ and ranges against the target file. Temporary-copy tests detect removed guards;
 the tracing guide identifies provider IDs as a host-owned set. No product runtime
 behavior or ADR-0012 guarantee changes, and no live stack was run.
 
+Two Proposed ADRs record the trace-sink follow-up decisions.
+[ADR-0032](adr/0032-development-text-on-agent-root-spans.md) defines gated
+development text on each eligible segment root (`galaxie-d53.7`).
+[ADR-0033](adr/0033-brokered-node-and-model-spans.md) defines host-side model
+spans and spans for explicitly reported LangGraph Python and ADK Go steps
+(`galaxie-d53.8`, `galaxie-d53.9`). Implementation and backend readback remain
+follow-up work. The existing attribute allowlists, runtime behavior and
+ADR-0012 guarantees are unchanged.
+
 The tracing-sink spike's score, browser and coverage result writers now use its
 local JSON serializer. Offline tests preserve all thirteen committed result
 files' bytes, exercise the live-host exporter with a stub at both its default
