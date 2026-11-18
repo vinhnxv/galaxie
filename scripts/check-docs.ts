@@ -287,6 +287,15 @@ function checkLink(file: string, line: number, target: string): void {
       headingCache.set(full, anchors);
     }
     if (!anchors.has(fragment)) problem(file, line, `missing heading: ${target}`);
+  } else if (fragment.startsWith('L') && statSync(full).isFile()) {
+    const match = /^L([1-9]\d*)(?:-L([1-9]\d*))?$/.exec(fragment);
+    const start = Number(match?.[1]);
+    const end = Number(match?.[2] ?? match?.[1]);
+    const content = readFileSync(full, 'utf8');
+    const count =
+      content === '' ? 0 : content.split(/\r?\n/).length - Number(content.endsWith('\n'));
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || end < start || end > count)
+      problem(file, line, `invalid source lines: ${target}`);
   }
 }
 
@@ -297,7 +306,56 @@ function reference(label: string): string {
 function tracingKeys(source: string): Set<string> {
   const tree = ts.createSourceFile('tracing.ts', source, ts.ScriptTarget.Latest);
   const declarations = new Map<string, ts.VariableDeclaration[]>();
+  const unwrap = (node: ts.Expression): ts.Expression => {
+    let expression = node;
+    while (
+      ts.isParenthesizedExpression(expression) ||
+      ts.isAsExpression(expression) ||
+      ts.isTypeAssertionExpression(expression) ||
+      ts.isSatisfiesExpression(expression) ||
+      ts.isNonNullExpression(expression)
+    )
+      expression = expression.expression;
+    return expression;
+  };
+  const hasLiteralKey = (object: ts.ObjectLiteralExpression): boolean =>
+    object.properties.some((property) => {
+      if (ts.isSpreadAssignment(property)) {
+        const spread = unwrap(property.expression);
+        return ts.isObjectLiteralExpression(spread) && hasLiteralKey(spread);
+      }
+      const name = property.name;
+      return (
+        name !== undefined &&
+        (ts.isIdentifier(name) ||
+          ts.isStringLiteralLike(name) ||
+          (ts.isComputedPropertyName(name) && ts.isStringLiteralLike(unwrap(name.expression))))
+      );
+    });
   const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node)) {
+      const expression = unwrap(node.expression);
+      const property = ts.isElementAccessExpression(expression)
+        ? unwrap(expression.argumentExpression)
+        : undefined;
+      const method = ts.isPropertyAccessExpression(expression)
+        ? expression.name.text
+        : property !== undefined && ts.isStringLiteralLike(property)
+          ? property.text
+          : undefined;
+      const first = node.arguments[0];
+      const argument = first === undefined ? undefined : unwrap(first);
+      if (
+        (method === 'setAttribute' && argument !== undefined && ts.isStringLiteralLike(argument)) ||
+        (method === 'setAttributes' &&
+          argument !== undefined &&
+          ts.isObjectLiteralExpression(argument) &&
+          hasLiteralKey(argument))
+      )
+        throw new Error(
+          `literal tracing write outside attributes()/text() at tracing.ts:${tree.getLineAndCharacterOfPosition(node.getStart(tree)).line + 1}: ${node.getText(tree)}`,
+        );
+    }
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
       const name = node.name.text;
       if (name === 'ALLOWED' || name === 'text')

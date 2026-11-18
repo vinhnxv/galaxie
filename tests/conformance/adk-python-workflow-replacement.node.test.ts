@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import {
   type CapabilityContext,
+  type ConfirmationId,
   createRuntime,
   type DiagnosticEvent,
   defineAgentDefinition,
@@ -131,6 +132,8 @@ interface Script {
   parallel: boolean;
   fail: boolean;
   beforeFailure: Promise<void>;
+  /** When set, the sibling's model reply waits until write 1 has been dispatched. */
+  firstWrite?: Promise<void>;
   requests: Request[];
   sibling?: {
     started: ReturnType<typeof Promise.withResolvers<void>>;
@@ -169,6 +172,11 @@ class StageModel extends BaseChatModel {
         // A sibling call that is emitted but not yet dispatched is not covered here.
         await sibling.release.promise;
       } else sibling.release.resolve();
+    }
+    if (name === 'c' && !afterTool && this.script.firstWrite) {
+      // The sibling must reach the shared tool lock after write 1: the lock is held across the
+      // sibling's approval, so the other order would leave write 1 undispatched forever.
+      await this.script.firstWrite;
     }
     if (name === 'b' && afterTool && this.script.fail) {
       this.script.fail = false;
@@ -233,11 +241,13 @@ async function runWorkflowReplacement({
   retry,
   holdWrite = false,
   cancelSibling = false,
+  holdApproval = false,
 }: {
   parallel: boolean;
   retry: boolean;
   holdWrite?: boolean;
   cancelSibling?: boolean;
+  holdApproval?: boolean;
 }): Promise<void> {
   const oracle = native[`${parallel ? 'True' : 'False'}-${retry ? 'True' : 'False'}`];
   if (!oracle) throw new Error('The native Workflow observation is missing.');
@@ -249,6 +259,11 @@ async function runWorkflowReplacement({
   const recovery = new ReceiptedRecoveryStore();
   const heldWrite = Promise.withResolvers<void>();
   const writeStarted = Promise.withResolvers<void>();
+  const approvalQueued = Promise.withResolvers<void>();
+  const firstWriteDispatched = Promise.withResolvers<void>();
+  let heldConfirmation: ConfirmationId | undefined;
+  let approvalAttempt = 0;
+  const approvedWrites: { attempt: number; value: unknown }[] = [];
   const sibling = {
     started: Promise.withResolvers<void>(),
     release: Promise.withResolvers<void>(),
@@ -258,13 +273,16 @@ async function runWorkflowReplacement({
     parallel,
     fail: retry,
     requests: [],
-    // The control waits for dispatch only; oracle retries wait for both receipts.
-    beforeFailure: cancelSibling
-      ? sibling.started.promise
-      : holdWrite
-        ? writeStarted.promise
-        : recovery.receipts.promise,
+    // Race controls wait for the held boundary; oracle retries wait for both receipts.
+    beforeFailure: holdApproval
+      ? approvalQueued.promise
+      : cancelSibling
+        ? sibling.started.promise
+        : holdWrite
+          ? writeStarted.promise
+          : recovery.receipts.promise,
     ...(cancelSibling ? { sibling } : {}),
+    ...(holdApproval ? { firstWrite: firstWriteDispatched.promise } : {}),
   };
   const model = new StageModel(script);
   const invoked: number[] = [];
@@ -326,6 +344,7 @@ async function runWorkflowReplacement({
             retry: 'none',
             async invoke(input: { value: number }, context: CapabilityContext) {
               invoked.push(input.value);
+              if (input.value === 1) firstWriteDispatched.resolve();
               invocationRuns.push(context.runId);
               if (holdWrite && input.value === 2) {
                 writeStarted.resolve();
@@ -338,10 +357,24 @@ async function runWorkflowReplacement({
       },
     );
     await instance.prepare();
-    stop = autoApprove(instance);
+    stop = holdApproval
+      ? instance.subscribe(() => {
+          for (const pending of instance.getSnapshot().confirmations ?? []) {
+            const value = (pending.arguments as { value: unknown }).value;
+            if (approvalAttempt === 0 && value === 2) {
+              heldConfirmation = pending.id;
+              approvalQueued.resolve();
+            } else {
+              approvedWrites.push({ attempt: approvalAttempt, value });
+              instance.respond(pending.id, 'approve');
+            }
+          }
+        })
+      : autoApprove(instance);
     const outputs: unknown[] = [],
       errors: string[] = [];
     for (let attempt = 0; attempt < (retry ? 2 : 1); attempt++) {
+      approvalAttempt = attempt;
       const { runId } = await instance.start({ prompt: 'run the stages' });
       attemptRuns.push(runId);
       const events: RunEvent[] = [];
@@ -363,16 +396,24 @@ async function runWorkflowReplacement({
       if (holdWrite && attempt === 0) heldWrite.resolve();
       if (retry && attempt === 0) {
         expect(checkpoints.rows.size).toBe(0);
-        if (cancelSibling) {
+        if (cancelSibling || holdApproval) {
           // system-design.md §8.3: succeeded receipts replay without invocation;
           // an absent write is planned and dispatched on retry. Branch b's post-tool
-          // failure implies write 1 succeeded; c's held model has requested no write.
+          // failure implies write 1 succeeded; c has not passed host approval.
           expect(errors).toEqual(['unavailable']);
           expect(invoked).toEqual([1]);
           expect(invocationRuns).toEqual([runId]);
           expect([...recovery.journal.values()].map((record) => record.status)).toEqual([
             'succeeded',
           ]);
+          if (holdApproval) {
+            expect(heldConfirmation).toBeDefined();
+            expect(instance.getSnapshot().confirmations).toBeUndefined();
+            if (heldConfirmation === undefined)
+              throw new Error('The sibling approval was not queued.');
+            expect(instance.respond(heldConfirmation, 'approve')).toEqual({ status: 'stale' });
+            expect(approvedWrites).toEqual([{ attempt: 0, value: 1 }]);
+          }
         } else if (!holdWrite) {
           const message = `Receipt barrier requires both write receipts: ${JSON.stringify(timeline)}`;
           expect([...invoked].sort(), message).toEqual([1, 2]);
@@ -394,7 +435,7 @@ async function runWorkflowReplacement({
       expect(fixture.workerErrors).toEqual([]);
       return;
     }
-    if (cancelSibling) {
+    if (cancelSibling || holdApproval) {
       expect(errors, message).toEqual(['unavailable']);
       expect(invoked).toEqual([1, 2]);
       expect(invocationRuns).toEqual(attemptRuns);
@@ -407,6 +448,11 @@ async function runWorkflowReplacement({
       expect(fixture.counts.created).toBe(1);
       expect(checkpoints.rows.size).toBeGreaterThan(0);
       expect(fixture.workerErrors).toEqual([]);
+      if (holdApproval)
+        expect(approvedWrites).toEqual([
+          { attempt: 0, value: 1 },
+          { attempt: 1, value: 2 },
+        ]);
       return;
     }
     expect(errors, message).toEqual(oracle.errors);
@@ -474,6 +520,14 @@ test.skipIf(!pythonWheelsAvailable)(
   'Workflow replacement retries while a sibling model reply is still pending at the failure',
   async () => {
     await runWorkflowReplacement({ parallel: true, retry: true, cancelSibling: true });
+  },
+  240000,
+);
+
+test.skipIf(!pythonWheelsAvailable)(
+  'Workflow replacement retries a sibling write emitted before failure but awaiting host approval',
+  async () => {
+    await runWorkflowReplacement({ parallel: true, retry: true, holdApproval: true });
   },
   240000,
 );

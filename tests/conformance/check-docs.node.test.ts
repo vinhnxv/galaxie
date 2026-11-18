@@ -98,6 +98,29 @@ test.each([
   expect(result.output).toContain(`guide.md:3: ${message}`);
 });
 
+test('checks source line fragments including encoded fragments and ranges', () => {
+  const root = fixture({
+    'guide.md':
+      '[First](source.ts#L1) [Last](source.ts#L2) [Range](source.ts#L1-L2) [Encoded](source.ts#%4C2)\n',
+    'source.ts': 'first\nlast\n',
+  });
+  expect(run(root)).toEqual({ status: 0, output: '' });
+});
+
+test.each(['L0', 'L3', 'L2-L1', 'L1-L3', 'L1-L', 'L1.5'])(
+  'rejects an invalid source line fragment: %s',
+  (fragment) => {
+    const result = run(
+      fixture({
+        'guide.md': `[Source](source.ts#${fragment})\n`,
+        'source.ts': 'first\nlast\n',
+      }),
+    );
+    expect(result.status).toBe(1);
+    expect(result.output).toContain(`guide.md:1: invalid source lines: source.ts#${fragment}`);
+  },
+);
+
 test.each(['AGENTS.md', 'README.md'])('requires each package %s', (name) => {
   const root = fixture();
   rmSync(join(root, 'packages/demo', name));
@@ -489,6 +512,44 @@ function tracingFixture(): string {
     [tracingGuideFile]: `# Tracing\n\n${table}\n`,
   });
 }
+
+test.each([
+  "span.setAttribute('galaxie.fixture', 'value');",
+  "span['setAttribute'](`galaxie.fixture`, 'value');",
+  "span.setAttributes({ 'galaxie.fixture': 'value' });",
+  "span.setAttributes({ ['galaxie.fixture']: 'value' });",
+  "span.setAttributes({ fixture: 'value' });",
+  "span.setAttribute(('galaxie.fixture'), 'value');",
+  "span.setAttribute(('galaxie.fixture' as string)!, 'value');",
+  "span.setAttribute((<string>'galaxie.fixture'), 'value');",
+  "span.setAttribute(('galaxie.fixture' satisfies string), 'value');",
+  "(span.setAttribute)('galaxie.fixture', 'value');",
+  "span[('setAttribute')]('galaxie.fixture', 'value');",
+  "span.setAttributes(({ 'galaxie.fixture': 'value' }) as Attributes);",
+  "span.setAttributes({ ...({ ...{ 'galaxie.fixture': 'value' } } as Attributes) });",
+  "span.setAttributes({ [('galaxie.fixture' as const)]: 'value' });",
+])('rejects a literal tracing write outside the inventory helpers: %s', (write) => {
+  const root = tracingFixture();
+  const source = readFileSync(join(root, tracingSourceFile), 'utf8');
+  writeFileSync(join(root, tracingSourceFile), `${source}\nfunction bypass(): void { ${write} }\n`);
+  const result = run(root);
+  expect(result.status).toBe(1);
+  expect(result.output).toMatch(
+    new RegExp(
+      `literal tracing write outside attributes\\(\\)/text\\(\\) at tracing\\.ts:${source.split('\n').length + 1}:`,
+    ),
+  );
+});
+
+test('accepts tracing writes routed through the metadata and text helpers', () => {
+  const root = tracingFixture();
+  const source = readFileSync(join(root, tracingSourceFile), 'utf8');
+  writeFileSync(
+    join(root, tracingSourceFile),
+    `${source}\nspan.setAttributes((attributes({ 'galaxie.run.status': 'ok' })) as Attributes);\n`,
+  );
+  expect(run(root)).toEqual({ status: 0, output: '' });
+});
 
 test('rejects an emitted tracing key without a table entry in a temporary source copy', () => {
   const root = tracingFixture();

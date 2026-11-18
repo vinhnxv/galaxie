@@ -3,9 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { execFileSync } from 'node:child_process';
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { type Context, context, ROOT_CONTEXT } from '@opentelemetry/api';
 import { type ReadableSpan, StackContextManager } from '@opentelemetry/sdk-trace';
 import { afterAll, expect, test } from 'vitest';
@@ -22,6 +20,7 @@ import {
 import { coverageReadback, scanMarkers } from '../src/coverage-readback.js';
 import { type CoverageProvider, createProvider } from '../src/families/provider.js';
 import { canary } from '../src/host.js';
+import { resultJson } from '../src/result-json.js';
 import { prompt, reply, runScenario } from '../src/scenarios.js';
 
 const live = test.skipIf(process.env['LLMOPS_STACK'] !== '1');
@@ -358,11 +357,7 @@ live('assemble and atomically format a complete matrix only after all families r
     ],
   };
   auditMatrix(matrix);
-  const formatted = execFileSync(
-    fileURLToPath(new URL('../../../node_modules/.bin/biome', import.meta.url)),
-    ['format', '--stdin-file-path', 'results/coverage-matrix.json'],
-    { input: `${JSON.stringify(matrix, null, 2)}\n`, encoding: 'utf8' },
-  );
+  const formatted = resultJson(matrix);
   const destination = new URL('../results/coverage-matrix.json', import.meta.url);
   const temporary = new URL('../results/coverage-matrix.json.tmp', import.meta.url);
   writeFileSync(temporary, formatted);

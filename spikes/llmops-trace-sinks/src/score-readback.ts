@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { canary } from './host.js';
 import { scanBundle } from './request-scan.js';
+import { resultJson } from './result-json.js';
 import { readEnv } from './secrets.js';
 
 export function inspectFeedback(value: unknown): void {
@@ -21,10 +20,5 @@ export function inspectFeedback(value: unknown): void {
 
 export function writeFeedback(name: string, value: unknown): void {
   inspectFeedback(value);
-  const formatted = execFileSync(
-    fileURLToPath(new URL('../../../node_modules/.bin/biome', import.meta.url)),
-    ['format', '--stdin-file-path', `results/${name}`],
-    { input: `${JSON.stringify(value, null, 2)}\n`, encoding: 'utf8' },
-  );
-  writeFileSync(new URL(`../results/${name}`, import.meta.url), formatted);
+  writeFileSync(new URL(`../results/${name}`, import.meta.url), resultJson(value));
 }

@@ -8,6 +8,20 @@ import { canary, collectorUrl } from '../src/host.js';
 import { observationsQuery, readBack } from '../src/readback.js';
 import { errorText, prompt, reply, runScenario, scenarios } from '../src/scenarios.js';
 
+const exporter = vi.hoisted(() => ({ destinations: [] as string[], exported: 0 }));
+vi.mock('@opentelemetry/exporter-trace-otlp-http', () => ({
+  OTLPTraceExporter: class {
+    constructor(options: { url: string }) {
+      exporter.destinations.push(options.url);
+    }
+    export(spans: readonly unknown[], callback: (result: { code: number }) => void): void {
+      exporter.exported += spans.length;
+      callback({ code: 0 });
+    }
+    async shutdown(): Promise<void> {}
+  },
+}));
+
 vi.mock('../src/secrets.js', () => ({
   readEnv: () => ({ MLFLOW_PORT: '5100', MLFLOW_EXPERIMENT_ID: '1' }),
 }));
@@ -63,6 +77,21 @@ test.each([
 
 test('collector destination is the local OTLP HTTP traces endpoint', () => {
   expect(collectorUrl).toBe('http://127.0.0.1:4318/v1/traces');
+});
+
+test.each([
+  [undefined, 'http://127.0.0.1:4318/v1/traces'],
+  ['http://127.0.0.1:54321/custom/traces', 'http://127.0.0.1:54321/custom/traces'],
+])('the live host exports spans to the configured destination: %s', async (url, expected) => {
+  exporter.destinations.length = 0;
+  exporter.exported = 0;
+  await runScenario('linear', {
+    text: false,
+    live: true,
+    ...(url === undefined ? {} : { exporterUrl: url }),
+  });
+  expect(exporter.destinations).toEqual([expected]);
+  expect(exporter.exported).toBeGreaterThan(0);
 });
 
 test.each(scenarios)('%s has the expected offline oracle in both text modes', async (name) => {

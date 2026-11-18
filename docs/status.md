@@ -1,5 +1,29 @@
 # Project status
 
+On 2026-11-18, the offline documentation check rejects literal span-attribute
+writes that bypass the tracing inventories and checks source-link line fragments
+and ranges against the target file. Temporary-copy tests detect removed guards;
+the tracing guide identifies provider IDs as a host-owned set. No product runtime
+behavior or ADR-0012 guarantee changes, and no live stack was run.
+
+The tracing-sink spike's score, browser and coverage result writers now use its
+local JSON serializer. Offline tests preserve all thirteen committed result
+files' bytes, exercise the live-host exporter with a stub at both its default
+and configured destinations, and verify tracing shutdown and temporary-directory
+removal after a Pyodide preparation timeout. The local offline suite passes;
+live collector/backend ingestion was not rerun.
+
+The ADK Python retry test also covers a sibling model that emits its write before
+branch failure while host approval remains pending. Attempt zero leaves one
+succeeded receipt and invalidates that approval; retry reuses write one's receipt
+and approves write two in the same Worker. Seven Node/Pyodide cases pass, and the
+new variant passed repeated runs including under CPU load; receipt-replay and premature-approval
+mutations fail. The new case does not run in Chromium. Hosted Workflow admission
+and a reversed arrival with the sibling holding the shared tool lock remain
+outside this case. Cancellation-path analysis and existing native cancellation
+tests do not establish the CI-only `invalid` root cause; runtime behavior and
+ADR-0012 guarantees are unchanged.
+
 On 2026-11-17, Python starter prepack compares both local wheels' Python modules
 with their repository sources and checks metadata-input hashes recorded by the
 trusted wheel build. Older cache inventories require rebuilding; these hashes
