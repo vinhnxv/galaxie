@@ -4,6 +4,7 @@
 import { writeFile } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Request } from 'playwright';
 import type { Mode, NodeRequest, Result, Step, TemplateSpec } from './standalone-core.js';
 
 export interface Arguments {
@@ -196,6 +197,23 @@ export const templateSpecs: readonly TemplateSpec[] = [
   ),
 ];
 
+function diagnosticPath(url: string): string {
+  const { pathname } = new URL(url);
+  if (
+    pathname === '/' ||
+    pathname === '/favicon.ico' ||
+    pathname === '/api/session' ||
+    pathname === '/api/v1/chat/completions' ||
+    pathname === '/go/agent.wasm' ||
+    pathname === '/python/runtime/pyodide.asm.wasm'
+  )
+    return pathname;
+  // Unknown path segments can contain credentials or absolute file paths.
+  for (const prefix of ['/assets/', '/python/runtime/', '/python/wheels/', '/python/agent/'])
+    if (pathname.startsWith(prefix)) return `${prefix}<file>`;
+  return '<path redacted>';
+}
+
 export async function driveChromium(
   url: string,
   spec: TemplateSpec,
@@ -225,10 +243,24 @@ export async function driveChromium(
     );
     let external = 0;
     const errors: string[] = [];
+    const requestErrors: string[] = [];
+    const addError = (message: string): void => {
+      if (errors.length < 16) errors.push(message);
+    };
+    let activity = 'navigation';
+    const requests = new WeakMap<Request, { step: string; start: number }>();
+    const requestError = (request: Request, reason: string): void => {
+      if (requestErrors.length >= 16) return;
+      const now = performance.now();
+      const { step, start } = requests.get(request) ?? { step: activity, start: now };
+      requestErrors.push(
+        `Drive ${step}: ${diagnosticPath(request.url())} — ${reason} (${Math.round(now - start)} ms)`,
+      );
+    };
     let probes = 0;
     let expected: Step['unavailable'];
     const responses = new Set<string>();
-    const diagnostics: string[] = [];
+    const diagnostics = new Set<string>();
     const flush = async (): Promise<void> => {
       await page.evaluate(
         'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))',
@@ -242,8 +274,14 @@ export async function driveChromium(
     });
     const page = await context.newPage();
     page.setDefaultTimeout(15000);
-    page.on('pageerror', () => errors.push('Page error.'));
-    page.on('requestfailed', () => errors.push('Request failed.'));
+    page.on('pageerror', () => addError('Page error.'));
+    page.on('request', (request) => {
+      requests.set(request, { step: activity, start: performance.now() });
+    });
+    page.on('requestfailed', (request) => {
+      const code = request.failure()?.errorText ?? '';
+      requestError(request, /^net::ERR_[A-Z0-9_]{1,48}$/.test(code) ? code : 'Request failed');
+    });
     page.on('response', (response) => {
       if (response.status() < 400) return;
       const target = new URL(response.url());
@@ -254,7 +292,7 @@ export async function driveChromium(
         target.pathname === expected.path
       )
         responses.add(response.url());
-      else errors.push(`HTTP status ${response.status()}.`);
+      else requestError(response.request(), `HTTP status ${response.status()}`);
     });
     page.on('console', (message) => {
       if (message.type() !== 'error') return;
@@ -271,38 +309,54 @@ export async function driveChromium(
           message.text(),
         )
       ) {
-        diagnostics.push(message.location().url);
+        diagnostics.add(message.location().url);
         return;
       }
-      errors.push('Console error.');
+      addError('Console error.');
     });
-    const response = await page.goto(url);
-    if (response?.status() !== 200) throw new Error('Page did not return 200.');
-    for (const step of spec.steps) {
-      expected = step.unavailable;
-      if (step.action === 'text') await page.getByText(step.name, { exact: true }).waitFor();
-      else {
-        if (step.role === undefined) throw new Error('Missing step role.');
-        const locator = page.getByRole(step.role, { name: step.name, exact: true });
-        if (step.action === 'check') await locator.check();
-        else if (step.action === 'click') await locator.click();
-        else await locator.waitFor();
+    try {
+      const response = await page.goto(url);
+      if (response?.status() !== 200) {
+        if (response !== null && response.status() < 400)
+          requestError(response.request(), `HTTP status ${response.status()}`);
+        addError('Page did not return 200.');
+      } else {
+        for (const [index, step] of spec.steps.entries()) {
+          activity = `step ${index + 1} (${step.action})`;
+          expected = step.unavailable;
+          if (step.action === 'text') await page.getByText(step.name, { exact: true }).waitFor();
+          else {
+            if (step.role === undefined) {
+              addError('Missing step role.');
+              break;
+            }
+            const locator = page.getByRole(step.role, { name: step.name, exact: true });
+            if (step.action === 'check') await locator.check();
+            else if (step.action === 'click') await locator.click();
+            else await locator.waitFor();
+          }
+          if (expected !== undefined) {
+            await page.getByText(expected.text, { exact: true }).waitFor();
+            await flush();
+            if (responses.size === 0) addError('Expected HTTP status 503 was not observed.');
+            for (const diagnostic of diagnostics)
+              if (!responses.has(diagnostic))
+                addError('Console error: uncorrelated HTTP status 503.');
+            responses.clear();
+            diagnostics.clear();
+          }
+          expected = undefined;
+        }
       }
-      if (expected !== undefined) {
-        await page.getByText(expected.text, { exact: true }).waitFor();
-        await flush();
-        if (responses.size === 0) errors.push('Expected HTTP status 503 was not observed.');
-        for (const diagnostic of diagnostics)
-          if (!responses.has(diagnostic))
-            errors.push('Console error: uncorrelated HTTP status 503.');
-        responses.clear();
-        diagnostics.length = 0;
-      }
-      expected = undefined;
+      await flush();
+    } catch {
+      // Playwright errors can include complete URLs, selectors or page content.
+      signal?.throwIfAborted();
+      addError(`Drive ${activity} failed.`);
     }
-    await flush();
-    if (external > 0) throw new Error(`Cross-origin request attempts: ${external}.`);
-    if (errors.length > 0) throw new Error(errors.join('\n'));
+    if (external > 0) requestErrors.unshift(`Cross-origin request attempts: ${external}.`);
+    if (requestErrors.length > 0 || errors.length > 0)
+      throw new Error([...requestErrors, ...errors].join('\n'));
     return browser.version();
   } finally {
     signal?.removeEventListener('abort', abort);

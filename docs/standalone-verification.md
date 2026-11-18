@@ -604,6 +604,13 @@ characters. Any gating or unclassified failure causes exit 1; usage errors exit 
 The human-readable matrix and JSON describe the same results. `--mode both`
 compares failures as pass, defect, release-gap or workspace-regression.
 
+Chromium reports failed requests with the navigation or numbered drive action
+that started them, the HTTP status or browser error code and request elapsed
+time. The excerpt shows known scaffold paths, masks unknown path segments and
+omits URL origins, queries and fragments. The harness requires a successful
+HTTP readiness response before opening Chromium. Each drive makes one initial
+navigation attempt.
+
 `pnpm check` does not run the real network matrix. Its Node conformance lane runs
 [the offline tests](../tests/conformance/verify-standalone.node.test.ts): pure
 helper tables and rejection controls; scaffold-hook arguments and artifact rejection;

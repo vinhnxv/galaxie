@@ -975,13 +975,15 @@ it.each([
   'correlates the unavailable diagnostic with the response and deliberate step (%s)',
   async (kind) => {
     const path = '/api/v1/chat/completions';
+    let requests = 0;
     const server = createServer((request, response) => {
       if (request.url !== '/') {
+        requests++;
         if (kind === 'failed-request') {
           request.socket.destroy();
           return;
         }
-        response.writeHead(kind === '500' ? 500 : 503);
+        response.writeHead(kind === '500' ? (requests === 1 ? 500 : 200) : 503);
         response.end('unavailable');
         return;
       }
@@ -990,7 +992,8 @@ it.each([
         kind === 'uncorrelated'
           ? "console.error('Failed to load resource: the server responded with a status of 503 (Service Unavailable)');"
           : '';
-      const action = `document.querySelector('p').textContent='Waiting'; fetch('${kind === 'other-path' ? '/other' : path}').catch(()=>{}).finally(()=>{${diagnostic}document.querySelector('p').textContent='Unavailable'})`;
+      const target = kind === 'other-path' ? '/private/Users/fixture-home/path-canary' : path;
+      const action = `document.querySelector('p').textContent='Waiting'; fetch('${target}?token=fixture-query-canary',{method:'POST'}).catch(()=>{}).finally(()=>{${diagnostic}document.querySelector('p').textContent='Unavailable'})`;
       response.end(
         `<button onclick="${action}">Submit answers</button><p>Waiting</p>${kind === 'outside-step' ? `<script>${action}</script>` : ''}`,
       );
@@ -1016,10 +1019,20 @@ it.each([
       if (kind === 'expected') expect(await drive).toMatch(/\d+\./);
       else if (kind === 'uncorrelated')
         await expect(drive).rejects.toThrow('Console error: uncorrelated HTTP status 503.');
-      else if (kind === '500') await expect(drive).rejects.toThrow('HTTP status 500.');
-      else if (kind === 'outside-step' || kind === 'other-path')
-        await expect(drive).rejects.toThrow('HTTP status 503.');
-      else if (kind === 'failed-request') await expect(drive).rejects.toThrow('Request failed.');
+      else if (kind === '500' || kind === 'failed-request') {
+        const diagnostic = await drive.catch((error: unknown) => String(error));
+        const outcome = kind === '500' ? 'HTTP status 500' : 'net::ERR_EMPTY_RESPONSE';
+        expect(diagnostic).toContain(`Drive step 1 (click): ${path} — ${outcome}`);
+        expect(diagnostic).toMatch(/\(\d+ ms\)/);
+        expect(diagnostic).not.toContain('fixture-query-canary');
+        expect(diagnostic).not.toContain('127.0.0.1');
+        if (kind === '500') expect(requests).toBe(1);
+      } else if (kind === 'other-path') {
+        const diagnostic = await drive.catch((error: unknown) => String(error));
+        expect(diagnostic).toContain('Drive step 1 (click): <path redacted> — HTTP status 503');
+        expect(diagnostic).not.toContain('fixture-home');
+        expect(diagnostic).not.toContain('path-canary');
+      } else if (kind === 'outside-step') await expect(drive).rejects.toThrow('HTTP status 503');
       else await expect(drive).rejects.toThrow(/Console error|HTTP status|Request failed/);
     } finally {
       server.closeAllConnections();
@@ -1027,6 +1040,40 @@ it.each([
     }
   },
   30000,
+);
+
+it.each(['refused', '500'] as const)(
+  'reports the initial Chromium navigation failure without retrying (%s)',
+  async (kind) => {
+    let requests = 0;
+    const server = createServer((request, response) => {
+      if (!request.url?.startsWith('/?')) {
+        response.writeHead(204).end();
+        return;
+      }
+      response.writeHead(++requests === 1 ? 500 : 200);
+      response.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (address === null || typeof address === 'string') throw new Error('No port');
+    const close = (): Promise<void> => new Promise((resolve) => server.close(() => resolve()));
+    if (kind === 'refused') await close();
+    try {
+      const diagnostic = await driveChromium(
+        `http://127.0.0.1:${address.port}/?token=fixture-navigation-canary`,
+        fixtureSpec,
+      ).catch((error: unknown) => String(error));
+      const outcome = kind === 'refused' ? 'net::ERR_CONNECTION_REFUSED' : 'HTTP status 500';
+      expect(diagnostic).toContain(`Drive navigation: / — ${outcome}`);
+      expect(diagnostic).toMatch(/\(\d+ ms\)/);
+      expect(diagnostic).not.toContain('fixture-navigation-canary');
+      expect(diagnostic).not.toContain('127.0.0.1');
+      expect(requests).toBe(kind === 'refused' ? 0 : 1);
+    } finally {
+      if (server.listening) await close();
+    }
+  },
 );
 
 it('keeps a refused binary associated with the requested Node major', async () => {
