@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import {
   cp,
@@ -18,6 +19,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { basename, delimiter, dirname, join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
+import { stringify } from 'yaml';
 import type {
   Command,
   Result,
@@ -29,6 +31,7 @@ import {
   assertCleanPath,
   assertCommand,
   assertCopy,
+  assertManagedTarballs,
   assertOutside,
   assertSingleCopies,
   classify,
@@ -107,6 +110,41 @@ function scaffoldFixture(source: string): (request: ScaffoldRequest) => Promise<
   return async ({ directory }) => {
     await cp(source, directory, { recursive: true });
   };
+}
+
+const archiveFixture = 'packed bytes';
+const archiveHash = createHash('sha512').update(archiveFixture);
+const archiveIntegrity = `sha512-${archiveHash.copy().digest('base64')}`;
+const archiveFingerprint = archiveHash.digest('hex').slice(0, 6);
+
+function managedLock(
+  manager: 'pnpm' | 'yarn',
+  archives: ReadonlyMap<string, string>,
+): Record<string, unknown> {
+  const entries = [...archives].map(([name, path]) => [`${name}@file:${path}`, path] as const);
+  return manager === 'pnpm'
+    ? {
+        lockfileVersion: '9.0',
+        packages: Object.fromEntries(
+          entries.map(([key, path]) => [
+            key,
+            { resolution: { tarball: `file:${path}`, integrity: archiveIntegrity } },
+          ]),
+        ),
+        snapshots: Object.fromEntries(entries.map(([key]) => [`${key}(peer@1.0.0)`, {}])),
+      }
+    : {
+        __metadata: { version: 10 },
+        ...Object.fromEntries(
+          entries.map(([key, path]) => [
+            key,
+            {
+              resolution: `${key}#${path}::hash=${archiveFingerprint}&locator=app`,
+              checksum: `10c0/${'e'.repeat(128)}`,
+            },
+          ]),
+        ),
+      };
 }
 async function unexpectedScaffold(): Promise<void> {
   throw new Error('Unexpected scaffold.');
@@ -374,12 +412,22 @@ it('parses the documented CLI forms and refuses malformed or unknown arguments',
     ['--kind', 'missing'],
     ['--template', 'local-only'],
     ['--mode', 'missing'],
+    ['--package-manager', 'bun', '--mode', 'tarball'],
+    ['--package-manager', 'pnpm'],
+    ['--package-manager', 'yarn', '--mode', 'both'],
+    ['--package-manager', 'pnpm', '--mode', 'tarball', '--min-release-age-exclude', 'react'],
     ['--budget-minutes'],
     ...['0', '61', 'x', '1.5', '-1', 'Infinity'].map((value) => ['--budget-minutes', value]),
     ['--server-budget-minutes'],
     ...['0', '61', 'x', '1.5', '-1', 'Infinity'].map((value) => ['--server-budget-minutes', value]),
   ])
     expect(() => parseArguments(args)).toThrow('Usage');
+  for (const manager of ['pnpm', 'yarn']) {
+    expect(parseArguments(['--mode', 'tarball', '--package-manager', manager])).toMatchObject({
+      mode: 'tarball',
+      packageManager: manager,
+    });
+  }
   expect(templateSpecs.map(({ name, kind, framework }) => ({ name, kind, framework }))).toEqual([
     { name: 'browser-only-langgraph-js', kind: 'browser-only', framework: 'langgraph-js' },
     { name: 'gateway-langgraph-js', kind: 'gateway', framework: 'langgraph-js' },
@@ -405,6 +453,8 @@ it('renders every phase and source and preserves the JSON result shape', () => {
   const result: Result = {
     template: 'fixture',
     node: 'v24.15.0',
+    packageManager: 'npm',
+    packageManagerVersion: '12.2.2',
     npm: '12.2.2',
     mode: 'registry' as const,
     releaseAgeDays: 7,
@@ -436,6 +486,170 @@ it('renders every phase and source and preserves the JSON result shape', () => {
   expect(renderResults([result])).toContain('1234 ms');
   expect(JSON.parse(JSON.stringify(result))).toEqual(result);
 });
+
+it.each(['pnpm', 'yarn'] as const)(
+  'requires one verified local tarball per %s lock entry',
+  async (manager) => {
+    const root = await temporary();
+    const name = '@galaxie-ai/core';
+    const path = join(root, 'core.tgz');
+    await writeFile(path, archiveFixture);
+    const archives = new Map([[name, path]]);
+    const key = `${name}@file:${path}`;
+    const lock = managedLock(manager, archives);
+    const verify = (source: unknown): Promise<void> =>
+      assertManagedTarballs(manager, stringify(source), root, archives, [name]);
+    const source = stringify(lock, { lineWidth: 0 });
+    const verifyText = (text: string): Promise<void> =>
+      assertManagedTarballs(manager, text, root, archives, [name]);
+    await expect(verify(lock)).resolves.toBeUndefined();
+    await expect(verify(managedLock(manager, new Map()))).rejects.toThrow(name);
+    await expect(verifyText(source.replaceAll(path, join(root, 'wrong.tgz')))).rejects.toThrow(
+      name,
+    );
+    const registryKey = `${name}@npm:0.2.0`;
+    if (manager === 'pnpm') {
+      const packages = lock['packages'] as Record<string, unknown>;
+      const snapshots = lock['snapshots'] as Record<string, unknown>;
+      await expect(verifyText(source.replace(archiveIntegrity, 'sha512-wrong'))).rejects.toThrow(
+        name,
+      );
+      await expect(
+        verify({ ...lock, packages: { ...packages, [registryKey]: {} } }),
+      ).rejects.toThrow(name);
+      await expect(verify({ ...lock, snapshots: { ...snapshots, [key]: {} } })).rejects.toThrow(
+        name,
+      );
+      await expect(verify({ ...lock, snapshots: { [registryKey]: {} } })).rejects.toThrow(name);
+      await expect(
+        verify({ ...lock, snapshots: { ...snapshots, '@galaxie-ai/extra@3.0.0': {} } }),
+      ).rejects.toThrow('@galaxie-ai/extra');
+    } else {
+      await expect(verifyText(source.replace(archiveFingerprint, '123456'))).rejects.toThrow(name);
+      await expect(verifyText(source.replace(/^  checksum:.*\n/m, ''))).rejects.toThrow(name);
+      await expect(verify({ ...lock, [registryKey]: { resolution: registryKey } })).rejects.toThrow(
+        name,
+      );
+      await expect(
+        verify({ ...lock, 'alias@npm:0.2.0': { resolution: '@galaxie-ai/extra@npm:0.2.0' } }),
+      ).rejects.toThrow('@galaxie-ai/extra');
+    }
+  },
+);
+
+it.each([
+  ['pnpm', '11.21.0', 'pnpm-workspace.yaml', 'pnpm-lock.yaml'],
+  ['yarn', '4.18.1', '.yarnrc.yml', 'yarn.lock'],
+] as const)(
+  'uses pinned %s for scaffolding and install and fails closed on an ineffective age gate',
+  async (manager, pin, config, lockfile) => {
+    const root = await temporary();
+    const repo = join(root, 'repo');
+    const packed = join(root, 'packed');
+    const bin = join(root, 'bin');
+    for (const path of [repo, packed, bin]) await mkdir(path);
+    await writeFile(join(repo, 'package.json'), '{"packageManager":"pnpm@11.21.0"}');
+    await writeFile(join(repo, 'pnpm-workspace.yaml'), 'minimumReleaseAge: 10081');
+    await writeFile(join(bin, 'corepack'), '', { mode: 0o755 });
+    await symlink('/bin/sh', join(bin, 'sh'));
+    for (const name of expectedLaunch)
+      await writeFile(
+        join(packed, name.replace('@galaxie-ai/', 'galaxie-ai-') + '-0.2.0.tgz'),
+        archiveFixture,
+      );
+    for (const proof of ['pass', 'ignored-policy', 'wrong-version'] as const) {
+      const calls: string[][] = [];
+      const results = await runStandalone(
+        {
+          repo,
+          tempBase: root,
+          nodes: [{ major: 24 }],
+          modes: ['tarball'],
+          specs: [{ ...fixtureSpec, build: ['build-canary.js'] }],
+          tarballs: packed,
+          cleanPath: true,
+          packageManager: manager,
+        },
+        {
+          environment: { PATH: bin, HOME: '/parent-home' },
+          scaffold: async ({ directory, env, tarballs }) => {
+            expect(env['npm_config_user_agent']).toBe(`${manager}/${pin}`);
+            expect(env['HOME']).not.toBe('/parent-home');
+            expect((await readdir(env['PATH'] ?? '')).sort()).toEqual(['node', 'sh']);
+            await mkdir(directory);
+            await writeFile(join(directory, 'package.json'), '{}');
+            await writeFile(join(directory, config), '# scaffold configuration\n');
+            const archives = new Map(
+              expectedLaunch.map((name) => [
+                name,
+                join(tarballs ?? '', name.replace('@galaxie-ai/', 'galaxie-ai-') + '-0.2.0.tgz'),
+              ]),
+            );
+            await writeFile(join(directory, lockfile), stringify(managedLock(manager, archives)));
+          },
+          driver: { drive: async () => 'stub' },
+          runner: {
+            run: async ({ args, cwd }) => {
+              if (args[0] === '--version') return 'v24.15.0';
+              if (args[0] === '-e') return '';
+              if (args[0] === 'build-canary.js') throw new Error('build canary');
+              expect(args[0]).toBe(join(await realpath(bin), 'corepack'));
+              expect(args[1]).toBe(`${manager}@${pin}`);
+              const rest = args.slice(2);
+              calls.push(rest);
+              if (rest[0] === '--version') return proof === 'wrong-version' ? '1.0.0' : pin;
+              const policy = await readFile(join(cwd, config), 'utf8');
+              expect(policy.startsWith('# scaffold configuration\n')).toBe(true);
+              if (manager === 'pnpm') {
+                expect(policy).toContain('minimumReleaseAge: 10081\n');
+                expect(policy).toContain('minimumReleaseAgeStrict: true\n');
+                expect(policy).toContain('minimumReleaseAgeIgnoreMissingTime: false\n');
+                expect(policy).toContain('preferSymlinkedExecutables: true\n');
+              } else {
+                expect(policy).toContain('npmMinimalAgeGate: 10081m\n');
+                expect(policy).toContain('checksumBehavior: throw\n');
+              }
+              if (rest[2] === 'minimumReleaseAgeStrict') return 'true';
+              if (rest[2] === 'minimumReleaseAgeIgnoreMissingTime') return 'false';
+              if (rest[0] === 'config') return proof === 'ignored-policy' ? '0' : '10081';
+              return '';
+            },
+            start: async () => {
+              throw new Error('unexpected server');
+            },
+          },
+        },
+      );
+      expect(results[0]?.packageManager).toBe(manager);
+      expect(results[0]?.failures).toMatchObject([
+        proof === 'pass'
+          ? { phase: 'build', excerpt: 'build canary' }
+          : proof === 'wrong-version'
+            ? {
+                phase: 'node',
+                excerpt: `${manager} version does not match the pinned version ${pin}.`,
+              }
+            : {
+                phase: 'install',
+                excerpt: expect.stringContaining('release-age policy did not take effect'),
+              },
+      ]);
+      expect(calls.filter(([command]) => command === 'install')).toEqual(
+        proof !== 'pass'
+          ? []
+          : manager === 'pnpm'
+            ? [
+                ['install', '--ignore-scripts', '--no-frozen-lockfile'],
+                ['install', '--ignore-scripts', '--frozen-lockfile', '--offline'],
+              ]
+            : [
+                ['install', '--mode=skip-build'],
+                ['install', '--mode=skip-build', '--immutable', '--check-cache'],
+              ],
+      );
+    }
+  },
+);
 
 it('runs a real offline npm file install, build and loopback server, then removes its project', async () => {
   const root = await temporary();

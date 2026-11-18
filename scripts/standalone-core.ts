@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { spawn } from 'node:child_process';
-import { constants } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { constants, createReadStream } from 'node:fs';
 import {
   access,
+  appendFile,
   cp,
   lstat,
   mkdir,
@@ -21,6 +23,8 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { parse } from 'yaml';
+import type { PackageManager } from '../packages/create/src/packages.js';
 
 export const launchPackages: readonly string[] = [
   'ui-protocol',
@@ -56,7 +60,9 @@ export interface Failure {
 export interface Result {
   readonly template: string;
   node: string;
-  npm: string;
+  readonly packageManager: PackageManager;
+  packageManagerVersion: string;
+  npm?: string;
   readonly mode: Mode;
   readonly releaseAgeDays: number;
   readonly exclude: string | null;
@@ -120,6 +126,7 @@ export interface Options {
   readonly tempBase?: string;
   readonly nodes: readonly NodeRequest[];
   readonly modes: readonly Mode[];
+  readonly packageManager?: PackageManager;
   readonly specs: readonly TemplateSpec[];
   readonly tarballs?: string;
   readonly keep?: boolean;
@@ -151,12 +158,16 @@ export interface Dependencies {
   readonly retained?: (path: string) => void;
 }
 
-export function releaseAgeDays(source: string): number {
+function releaseAgeMinutes(source: string): number {
   const values = [...source.matchAll(/^minimumReleaseAge:\s*(\d+)\s*(?:#.*)?$/gm)];
   const minutes = Number(values[0]?.[1]);
   if (values.length !== 1 || !Number.isSafeInteger(minutes) || minutes <= 0)
     throw new Error('Invalid minimumReleaseAge policy.');
-  return Math.ceil(minutes / 1440);
+  return minutes;
+}
+
+export function releaseAgeDays(source: string): number {
+  return Math.ceil(releaseAgeMinutes(source) / 1440);
 }
 
 export function isolatedEnvironment(
@@ -207,6 +218,17 @@ interface Manifest {
   readonly dependencies?: Record<string, string>;
 }
 
+function allowedTarball(name: string, framework: string): boolean {
+  return (
+    launchPackages.includes(name) ||
+    (framework === 'adk-js' && name === '@galaxie-ai/adapter-adk') ||
+    (framework === 'adk-go' &&
+      ['@galaxie-ai/adapter-go', '@galaxie-ai/starter-go'].includes(name)) ||
+    (framework === 'langgraph-python' &&
+      ['@galaxie-ai/adapter-pyodide', '@galaxie-ai/starter-python'].includes(name))
+  );
+}
+
 export function assertSingleCopies(
   lock: { packages?: Record<string, { resolved?: string }> },
   required: readonly string[],
@@ -216,24 +238,87 @@ export function assertSingleCopies(
   for (const [path, entry] of Object.entries(lock.packages ?? {})) {
     const name = /(?:^|\/)node_modules\/(@galaxie-ai\/[^/]+)$/.exec(path)?.[1];
     if (name === undefined) continue;
-    if (
-      (!launchPackages.includes(name) &&
-        !(framework === 'adk-js' && name === '@galaxie-ai/adapter-adk') &&
-        !(
-          framework === 'adk-go' &&
-          ['@galaxie-ai/adapter-go', '@galaxie-ai/starter-go'].includes(name)
-        ) &&
-        !(
-          framework === 'langgraph-python' &&
-          ['@galaxie-ai/adapter-pyodide', '@galaxie-ai/starter-python'].includes(name)
-        )) ||
-      !entry.resolved?.startsWith('file:')
-    )
+    if (!allowedTarball(name, framework) || !entry.resolved?.startsWith('file:'))
       throw new Error(`Single-copy tarball check failed for ${name}.`);
     counts.set(name, (counts.get(name) ?? 0) + 1);
   }
   for (const name of new Set([...required, ...counts.keys()]))
     if (counts.get(name) !== 1) throw new Error(`Single-copy tarball check failed for ${name}.`);
+}
+
+function lockRecord(value: unknown): Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value))
+    throw new Error('Single-copy tarball check failed: expected a lockfile mapping.');
+  return value as Record<string, unknown>;
+}
+
+const lockPackageName = /^(@galaxie-ai\/[^@\s]+)@/;
+const lockfileNames = { pnpm: 'pnpm-lock.yaml', yarn: 'yarn.lock' } as const;
+
+/** Check the file locators and digests recorded by the pinned pnpm and Yarn releases. */
+export async function assertManagedTarballs(
+  manager: 'pnpm' | 'yarn',
+  source: string,
+  project: string,
+  archives: ReadonlyMap<string, string>,
+  required: readonly string[],
+): Promise<void> {
+  const lock = lockRecord(parse(source, { maxAliasCount: 0 }));
+  if (manager === 'pnpm' && lock['lockfileVersion'] !== '9.0')
+    throw new Error('Single-copy tarball check failed: expected pnpm lockfile version 9.0.');
+  if (manager === 'yarn' && lockRecord(lock['__metadata'])['version'] !== 10)
+    throw new Error('Single-copy tarball check failed: expected Yarn lockfile version 10.');
+  const packages = manager === 'pnpm' ? lockRecord(lock['packages']) : lock;
+  const snapshots = manager === 'pnpm' ? Object.keys(lockRecord(lock['snapshots'])) : [];
+  const seen = new Set<string>();
+  const mismatch = (name: string): Error =>
+    new Error(`Single-copy tarball check failed for ${name}.`);
+  for (const [key, entry] of Object.entries(packages)) {
+    const yarnResolution = manager === 'yarn' ? lockRecord(entry)['resolution'] : undefined;
+    const name =
+      lockPackageName.exec(key)?.[1] ??
+      (typeof yarnResolution === 'string' ? lockPackageName.exec(yarnResolution)?.[1] : undefined);
+    if (name === undefined) continue;
+    const path = archives.get(name);
+    if (path === undefined || seen.has(name)) throw mismatch(name);
+    seen.add(name);
+    const record = lockRecord(entry);
+    const hash = createHash('sha512');
+    for await (const bytes of createReadStream(path)) hash.update(bytes as Buffer);
+    if (manager === 'pnpm') {
+      const resolution = lockRecord(record['resolution']);
+      const tarball = resolution['tarball'];
+      const reference = key.slice(name.length + 1);
+      if (
+        typeof tarball !== 'string' ||
+        !tarball.startsWith('file:') ||
+        tarball !== reference ||
+        resolve(project, tarball.slice('file:'.length)) !== path ||
+        resolution['integrity'] !== `sha512-${hash.digest('base64')}` ||
+        snapshots.filter((snapshot) => lockPackageName.exec(snapshot)?.[1] === name).length !== 1 ||
+        !snapshots.some((snapshot) => snapshot === key || snapshot.startsWith(`${key}(`))
+      )
+        throw mismatch(name);
+    } else {
+      const prefix = `${name}@file:${path}#${path}::`;
+      const checksum = record['checksum'];
+      // Yarn's locator records a short hash of the .tgz. Its full checksum covers the cache zip.
+      if (
+        typeof yarnResolution !== 'string' ||
+        !yarnResolution.startsWith(prefix) ||
+        new URLSearchParams(yarnResolution.slice(prefix.length)).get('hash') !==
+          hash.digest('hex').slice(0, 6) ||
+        typeof checksum !== 'string' ||
+        !/^[a-f0-9]+\/[a-f0-9]{128}$/i.test(checksum)
+      )
+        throw mismatch(name);
+    }
+  }
+  for (const snapshot of snapshots) {
+    const name = lockPackageName.exec(snapshot)?.[1];
+    if (name !== undefined && !seen.has(name)) throw mismatch(name);
+  }
+  for (const name of required) if (!seen.has(name)) throw mismatch(name);
 }
 
 const stripped = new Set([
@@ -453,6 +538,89 @@ const systemClock: Clock = {
   now: Date.now,
   sleep,
 };
+
+const yarnPin = 'yarn@4.18.1';
+
+async function packageManagerInvocation(
+  manager: PackageManager,
+  repo: string,
+  path: string,
+): Promise<{ prefix: readonly [string, ...string[]]; version?: string }> {
+  if (manager === 'npm') return { prefix: [await executableOnPath('npm', path)] };
+  let pin = yarnPin;
+  if (manager === 'pnpm') {
+    const workspace = JSON.parse(await readFile(join(repo, 'package.json'), 'utf8')) as {
+      packageManager?: string;
+    };
+    if (
+      workspace.packageManager === undefined ||
+      !/^pnpm@11\.\d+\.\d+$/.test(workspace.packageManager)
+    )
+      throw new Error('Expected a pinned pnpm 11 version.');
+    pin = workspace.packageManager;
+  }
+  const version = pin.slice(manager.length + 1);
+  return { prefix: [await executableOnPath('corepack', path), pin], version };
+}
+
+async function installProject(
+  manager: PackageManager,
+  run: (args: readonly string[]) => Promise<string>,
+  project: string,
+  minutes: number,
+  options: Options,
+): Promise<void> {
+  if (manager === 'npm') {
+    if (options.verifyReleaseAge !== false) {
+      const effective = (await run(['config', 'get', 'min-release-age'])).trim();
+      if (effective !== String(Math.ceil(minutes / 1440)))
+        throw new Error('npm release-age policy did not take effect.');
+    }
+    await run([
+      'install',
+      '--ignore-scripts',
+      '--no-audit',
+      '--no-fund',
+      ...(options.offline ? ['--offline'] : []),
+    ]);
+  } else if (manager === 'pnpm') {
+    await appendFile(
+      join(project, 'pnpm-workspace.yaml'),
+      `minimumReleaseAge: ${minutes}\nminimumReleaseAgeStrict: true\nminimumReleaseAgeIgnoreMissingTime: false\n` +
+        // pnpm's shell bin wrappers need system utilities outside the clean PATH.
+        (options.cleanPath ? 'preferSymlinkedExecutables: true\n' : ''),
+    );
+    const effective = (await run(['config', 'get', 'minimumReleaseAge'])).trim();
+    const strict = (await run(['config', 'get', 'minimumReleaseAgeStrict'])).trim();
+    const requiresTime = (
+      await run(['config', 'get', 'minimumReleaseAgeIgnoreMissingTime'])
+    ).trim();
+    if (effective !== String(minutes) || strict !== 'true' || requiresTime !== 'false')
+      throw new Error('pnpm release-age policy did not take effect.');
+    await run([
+      'install',
+      '--ignore-scripts',
+      '--no-frozen-lockfile',
+      ...(options.offline ? ['--offline'] : []),
+    ]);
+    await run(['install', '--ignore-scripts', '--frozen-lockfile', '--offline']);
+  } else {
+    await appendFile(
+      join(project, '.yarnrc.yml'),
+      `npmMinimalAgeGate: ${minutes}m\nchecksumBehavior: throw\n`,
+    );
+    const effective = (await run(['config', 'get', 'npmMinimalAgeGate', '--json'])).trim();
+    if (effective !== String(minutes))
+      throw new Error('Yarn release-age policy did not take effect.');
+    await run(['install', '--mode=skip-build']);
+    await run([
+      'install',
+      '--mode=skip-build',
+      '--immutable',
+      ...(options.offline ? ['--immutable-cache'] : ['--check-cache']),
+    ]);
+  }
+}
 const loopbackPorts: PortFinder = {
   find: (preferred = 0) =>
     new Promise((fulfill, reject) => {
@@ -587,6 +755,14 @@ export async function runStandalone(
   options: Options,
   dependencies: Dependencies,
 ): Promise<Result[]> {
+  const manager = options.packageManager ?? 'npm';
+  if (
+    manager !== 'npm' &&
+    (options.modes.some((mode) => mode !== 'tarball') || options.exclude !== undefined)
+  )
+    throw new Error(
+      'pnpm and Yarn verification require tarball mode without release-age exclusions.',
+    );
   const environment = dependencies.environment ?? process.env;
   const repo = await realpath(options.repo);
   const base = await realpath(options.tempBase ?? tmpdir());
@@ -605,11 +781,22 @@ export async function runStandalone(
   const clock = dependencies.clock ?? systemClock;
   const ports = dependencies.ports ?? loopbackPorts;
   try {
-    const days = releaseAgeDays(await readFile(join(repo, 'pnpm-workspace.yaml'), 'utf8'));
+    const minutes = releaseAgeMinutes(await readFile(join(repo, 'pnpm-workspace.yaml'), 'utf8'));
+    const days = Math.ceil(minutes / 1440);
     await writeFile(join(root, 'user.npmrc'), '');
     await writeFile(join(root, 'global.npmrc'), '');
     const env = isolatedEnvironment(environment, root, days, options.exclude);
-    const npmCli = await executableOnPath('npm', environment['PATH'] ?? '');
+    const { prefix, version } = await packageManagerInvocation(manager, repo, env['PATH'] ?? '');
+    const managerEnv = { ...env };
+    if (manager !== 'npm') {
+      managerEnv['HOME'] = join(root, 'home');
+      if (options.offline) managerEnv['COREPACK_ENABLE_NETWORK'] = '0';
+      if (manager === 'yarn') {
+        managerEnv['YARN_ENABLE_IMMUTABLE_INSTALLS'] = 'false';
+        managerEnv['YARN_NPM_REGISTRY_SERVER'] = 'https://registry.npmjs.org';
+        if (options.offline) managerEnv['YARN_ENABLE_NETWORK'] = 'false';
+      }
+    }
     const pnpm =
       options.modes.includes('tarball') && options.tarballs === undefined
         ? await executableOnPath('pnpm', environment['PATH'] ?? '')
@@ -643,7 +830,7 @@ export async function runStandalone(
       dependencies.runner ??
       processRunner([
         process.execPath,
-        npmCli,
+        prefix[0],
         ...(pnpm === undefined ? [] : [pnpm]),
         ...[...binaries.values()].filter((value): value is string => typeof value === 'string'),
       ]);
@@ -663,6 +850,7 @@ export async function runStandalone(
       ...(needsPython ? ['@galaxie-ai/adapter-pyodide', '@galaxie-ai/starter-python'] : []),
     ];
     let tarballs: string | undefined;
+    const archives = new Map<string, string>();
     let packError: unknown;
     if (options.modes.includes('tarball')) {
       try {
@@ -709,6 +897,7 @@ export async function runStandalone(
           );
           if (matches.length !== 1)
             throw new Error(`Packing is impossible: expected one tarball for ${name}.`);
+          archives.set(name, join(destination, matches[0] as string));
         }
         tarballs = destination;
       } catch (error) {
@@ -721,7 +910,9 @@ export async function runStandalone(
           const result: Result = {
             template: spec.name,
             node: String(request.major),
-            npm: 'unknown',
+            packageManager: manager,
+            packageManagerVersion: 'unknown',
+            ...(manager === 'npm' ? { npm: 'unknown' } : {}),
             mode,
             releaseAgeDays: days,
             exclude: options.exclude ?? null,
@@ -759,13 +950,14 @@ export async function runStandalone(
             if (binary instanceof Error) throw binary;
             if (binary === undefined) throw new Error('Node unavailable.');
             const childEnv = {
-              ...env,
+              ...managerEnv,
               PATH:
                 cleanPaths.get(request.major) ??
                 `${dirname(binary)}${delimiter}${env['PATH'] ?? ''}`,
             };
             const run = (args: readonly string[]): Promise<string> =>
               runner.run(command(binary, args, project, childEnv));
+            const manage = (args: readonly string[]): Promise<string> => run([...prefix, ...args]);
             const project = join(root, `${spec.name}-${request.major}-${mode}`);
             const observedNode = (
               await runner.run(command(binary, ['--version'], root, childEnv))
@@ -773,11 +965,18 @@ export async function runStandalone(
             if (Number(observedNode.replace(/^v/, '').split('.')[0]) !== request.major)
               throw new Error('Node version does not match requested major.');
             result.node = observedNode;
-            result.npm = (
-              await runner.run(command(binary, [npmCli, '--version'], root, childEnv))
+            result.packageManagerVersion = (
+              await runner.run(command(binary, [...prefix, '--version'], root, childEnv))
             ).trim();
-            if (options.verifyReleaseAge !== false && Number(result.npm.split('.')[0]) < 12)
+            if (manager === 'npm') result.npm = result.packageManagerVersion;
+            if (
+              manager === 'npm' &&
+              options.verifyReleaseAge !== false &&
+              Number(result.packageManagerVersion.split('.')[0]) < 12
+            )
               throw new Error('npm version 12 or later is required for release-age enforcement.');
+            if (version !== undefined && result.packageManagerVersion !== version)
+              throw new Error(`${manager} version does not match the pinned version ${version}.`);
             if (mode === 'tarball') {
               phase = 'pack';
               if (packError !== undefined) throw packError;
@@ -794,7 +993,13 @@ export async function runStandalone(
               mode,
               directory: project,
               node: binary,
-              env: childEnv,
+              env:
+                manager === 'npm'
+                  ? childEnv
+                  : {
+                      ...childEnv,
+                      npm_config_user_agent: `${manager}/${result.packageManagerVersion}`,
+                    },
               signal,
               runner,
               ...(mode === 'tarball' && tarballs !== undefined ? { tarballs } : {}),
@@ -804,19 +1009,7 @@ export async function runStandalone(
               await readFile(join(project, 'package.json'), 'utf8'),
             ) as Manifest;
             phase = 'install';
-            if (options.verifyReleaseAge !== false) {
-              const effective = (await run([npmCli, 'config', 'get', 'min-release-age'])).trim();
-              if (effective !== String(days))
-                throw new Error('npm release-age policy did not take effect.');
-            }
-            await run([
-              npmCli,
-              'install',
-              '--ignore-scripts',
-              '--no-audit',
-              '--no-fund',
-              ...(options.offline ? ['--offline'] : []),
-            ]);
+            await installProject(manager, manage, project, minutes, options);
             if (mode === 'tarball') {
               const required = [
                 ...new Set([
@@ -828,13 +1021,23 @@ export async function runStandalone(
                   ),
                 ]),
               ];
-              assertSingleCopies(
-                JSON.parse(
-                  await readFile(join(project, 'package-lock.json'), 'utf8'),
-                ) as Parameters<typeof assertSingleCopies>[0],
-                required,
-                spec.framework,
-              );
+              if (manager === 'npm') {
+                assertSingleCopies(
+                  JSON.parse(
+                    await readFile(join(project, 'package-lock.json'), 'utf8'),
+                  ) as Parameters<typeof assertSingleCopies>[0],
+                  required,
+                  spec.framework,
+                );
+              } else {
+                await assertManagedTarballs(
+                  manager,
+                  await readFile(join(project, lockfileNames[manager]), 'utf8'),
+                  project,
+                  new Map([...archives].filter(([name]) => allowedTarball(name, spec.framework))),
+                  required,
+                );
+              }
             }
             phase = 'build';
             await run(spec.build);
@@ -848,9 +1051,9 @@ export async function runStandalone(
               }
             }
             phase = 'check';
-            await run([npmCli, 'run', 'check']);
+            await manage(['run', 'check']);
             phase = 'negative-control';
-            await assertBaselineRejections(project, () => run([npmCli, 'run', 'check']), signal);
+            await assertBaselineRejections(project, () => manage(['run', 'check']), signal);
             const serve = async (
               args: readonly string[],
               port: number,
