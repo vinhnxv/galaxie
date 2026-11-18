@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
-import { chromium } from 'playwright';
+import { chromium } from 'playwright-core';
 import { preview } from 'vite';
 import { afterAll, describe, expect, test } from 'vitest';
 import { devGatewayOptions } from '../../packages/create/.cache/composed/gateway-langgraph-python/server/dev.js';
@@ -61,11 +61,12 @@ describe.skipIf(!hasStarterPython())('the composed LangGraph Python gateway star
             configurePreviewServer({ middlewares }) {
               middlewares.use(graphPath, (_request, response) => {
                 response.writeHead(200, {
+                  'Cache-Control': 'no-store',
                   'Content-Security-Policy': cspHeader(),
                   'Content-Type': 'application/octet-stream',
                 });
-                response.write(graphBytes.subarray(0, 1));
-                void releaseGraph.promise.then(() => response.end(graphBytes.subarray(1)));
+                response.write(graphBytes);
+                void releaseGraph.promise.then(() => response.end());
               });
             },
           },
@@ -88,7 +89,7 @@ describe.skipIf(!hasStarterPython())('the composed LangGraph Python gateway star
         args: ['--disable-gpu', '--disable-webgpu'],
       });
       const context = await browser.newContext({ serviceWorkers: 'block' });
-      await context.addInitScript(() => {
+      await context.addInitScript((delayedPath) => {
         Reflect.set(globalThis, 'starterViolations', []);
         document.addEventListener('securitypolicyviolation', (event) =>
           Reflect.get(globalThis, 'starterViolations').push(event.violatedDirective),
@@ -96,11 +97,33 @@ describe.skipIf(!hasStarterPython())('the composed LangGraph Python gateway star
         const sourceSignals: (AbortSignal | null | undefined)[] = [];
         Reflect.set(globalThis, 'starterSourceSignals', sourceSignals);
         const fetcher = globalThis.fetch;
-        globalThis.fetch = (input, init) => {
-          if (String(input).includes('/python/agent/')) sourceSignals.push(init?.signal);
-          return fetcher(input, init);
+        globalThis.fetch = async (input, init) => {
+          const url = String(input);
+          if (!url.includes('/python/agent/')) return fetcher(input, init);
+          sourceSignals.push(init?.signal);
+          const response = await fetcher(input, init);
+          if (url.endsWith(delayedPath) && response.body !== null) {
+            const getReader = response.body.getReader.bind(response.body);
+            let bytesRead = 0;
+            Object.defineProperty(response.body, 'getReader', {
+              value: () => {
+                const reader = getReader();
+                const read = reader.read.bind(reader);
+                reader.read = async () => {
+                  const chunk = await read();
+                  if (!chunk.done) {
+                    bytesRead += chunk.value.byteLength;
+                    Reflect.set(globalThis, 'starterGraphBytesRead', bytesRead);
+                  }
+                  return chunk;
+                };
+                return reader;
+              },
+            });
+          }
+          return response;
         };
-      });
+      }, graphPath);
       const requests: { messages: { role: string }[]; metadata: { promptId: string } }[] = [];
       const external: string[] = [];
       const errors: string[] = [];
@@ -130,7 +153,10 @@ describe.skipIf(!hasStarterPython())('the composed LangGraph Python gateway star
       );
       expect((await page.goto(origin))?.headers()['content-security-policy']).toBe(cspHeader());
       await Promise.all([
-        page.waitForResponse((response) => new URL(response.url()).pathname === graphPath),
+        page.waitForFunction(
+          (size) => Reflect.get(globalThis, 'starterGraphBytesRead') === size,
+          graphBytes.byteLength,
+        ),
         page.waitForEvent(
           'requestfinished',
           (request) =>
@@ -138,6 +164,7 @@ describe.skipIf(!hasStarterPython())('the composed LangGraph Python gateway star
         ),
         page.getByRole('button', { name: 'Start with gateway', exact: true }).click(),
       ]);
+      // Deliver EOF in its own write after Chromium has consumed the last bytes.
       releaseGraph.resolve();
       await page.getByRole('radio', { name: '4', exact: true }).check();
       expect(

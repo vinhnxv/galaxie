@@ -1020,7 +1020,8 @@ The conformance files in both test columns run on Node and Chromium. Node packag
 | `pnpm typecheck:ts6` | TypeScript 6 |
 | `CI=true pnpm test` | Both Vitest projects without writing missing goldens |
 | `pnpm conformance:update` | Write goldens from the native Node lane only; review the diff |
-| `pnpm exec playwright install --only-shell chromium` | Install the local headless Chromium binary; CI adds `--with-deps` |
+| `pnpm exec playwright install --no-remove --only-shell chromium` | Install the main headless Chromium build before `pnpm check`; CI adds `--with-deps` |
+| `pnpm exec playwright-core install --no-remove --only-shell chromium` | Install the headless Chromium build for LangGraph Python standalone drives and gateway conformance before `pnpm check` |
 | `pnpm exec vitest run --project 'browser (chromium)'` | Run only Chromium tests |
 | `pnpm build` | Build core, then the adapter against core's `dist`, and the mock, WebLLM and Built-in AI providers, including the WebLLM worker entry |
 
