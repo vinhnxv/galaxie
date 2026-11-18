@@ -353,16 +353,16 @@ export function createPyodideAdapter(
           }),
         );
       } catch (error) {
-        throw adapterFailure(
-          preparation.signal.aborted
-            ? 'cancelled'
-            : download.signal.aborted
-              ? 'timeout'
-              : failureCode(error, 'unavailable'),
-        );
+        const code = preparation.signal.aborted
+          ? 'cancelled'
+          : download.signal.aborted
+            ? 'timeout'
+            : failureCode(error, 'unavailable');
+        // Cancel pending siblings on failure. After EOF Chromium may still be finishing a request.
+        download.abort();
+        throw adapterFailure(code);
       } finally {
         clearTimeout(downloadTimer);
-        download.abort();
       }
 
       const dispatch = (client: Connection, message: BridgeMessage): void => {

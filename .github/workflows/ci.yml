@@ -136,6 +136,7 @@ jobs:
           go: "true"
           python: "true"
           browser: "true"
+          python-standalone-browser: "true"
       - run: |
           pnpm --filter @galaxie-ai/starter-go run prepack
           pnpm exec tsc -p packages/ui-protocol/tsconfig.build.json
@@ -201,6 +202,7 @@ jobs:
           python: "true"
           go: "true"
           browser: "true"
+          python-standalone-browser: ${{ matrix.group == 'python-rest' }}
       - run: |
           pnpm --filter @galaxie-ai/starter-go run prepack
           pnpm exec tsc -p packages/ui-protocol/tsconfig.build.json
@@ -293,7 +295,8 @@ jobs:
         with:
           go: ${{ matrix.framework == 'adk-go' }}
           python: ${{ matrix.framework == 'langgraph-python' }}
-          browser: "true"
+          browser: ${{ matrix.framework != 'langgraph-python' }}
+          python-standalone-browser: ${{ matrix.framework == 'langgraph-python' }}
       - name: Install the target Node 22
         if: matrix.node == 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

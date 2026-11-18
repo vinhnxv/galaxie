@@ -245,6 +245,45 @@ test('source preparation preserves explicit cancellation and clears its deadline
   expect(vi.getTimerCount()).toBe(0);
 });
 
+test('source preparation cancels a pending download when another source is unavailable', async () => {
+  const workers: FixtureWorker[] = [];
+  const pendingSignals: AbortSignal[] = [];
+  vi.stubGlobal('fetch', async (url: URL, { signal }: RequestInit) => {
+    if (url.pathname.endsWith('/agent.py')) return new Response(null, { status: 503 });
+    if (signal == null) throw new Error('Expected a signal for the pending source request.');
+    pendingSignals.push(signal);
+    return new Promise<Response>((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    });
+  });
+  await expect(
+    setup(workers).prepare(
+      { ...descriptor, files: ['agent.py', 'sibling.py'] },
+      { chatModels: { model: model() } },
+      preparation,
+    ),
+  ).rejects.toMatchObject({ code: 'unavailable' });
+  expect(pendingSignals.map((signal) => signal.aborted)).toEqual([true]);
+  expect(workers).toHaveLength(0);
+});
+
+test('source preparation leaves every download signal live after the bodies were read', async () => {
+  const workers: FixtureWorker[] = [];
+  const signals: AbortSignal[] = [];
+  vi.stubGlobal('fetch', async (_url: URL, { signal }: RequestInit) => {
+    if (signal == null) throw new Error('Expected a signal for the source request.');
+    signals.push(signal);
+    return new Response('def create_agent(): pass');
+  });
+  await setup(workers).prepare(
+    { ...descriptor, files: ['agent.py', 'sibling.py'] },
+    { chatModels: { model: model() } },
+    preparation,
+  );
+  expect(signals).toHaveLength(2);
+  expect(signals.map((signal) => signal.aborted)).toEqual([false, false]);
+});
+
 const offeredTools: NonNullable<ModelPayload['options']['tools']> = [
   { type: 'function', function: { name: 'double', parameters: { type: 'object' } } },
 ];

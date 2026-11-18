@@ -5,6 +5,10 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 
 const workflow = readFileSync(new URL('../../.github/workflows/ci.yml', import.meta.url), 'utf8');
+const setup = readFileSync(
+  new URL('../../.github/actions/setup/action.yml', import.meta.url),
+  'utf8',
+);
 const jobs = new Map(
   workflow
     .slice(workflow.indexOf('\njobs:\n'))
@@ -35,7 +39,13 @@ test('create-clean is scoped, bounded and uses pinned external actions', () => {
   expect(block).toContain('uses: ./.github/actions/setup');
   expect(block).toContain("go: ${{ matrix.framework == 'adk-go' }}");
   expect(block).toContain("python: ${{ matrix.framework == 'langgraph-python' }}");
-  expect(block).toContain('browser: "true"');
+  expect(block).toContain("browser: ${{ matrix.framework != 'langgraph-python' }}");
+  expect(block).toContain(
+    "python-standalone-browser: ${{ matrix.framework == 'langgraph-python' }}",
+  );
+  expect(setup).toContain(`    - if: inputs.python-standalone-browser == 'true'
+      run: pnpm exec playwright-core install --with-deps --no-remove --only-shell chromium`);
+  expect(job('test-general')).toContain('python-standalone-browser: "true"');
 });
 
 test('create-clean measures npm and pnpm in all eight Node 24 projects and Yarn in one', () => {
@@ -120,6 +130,7 @@ test('create-clean always logs JSON and writes per-project durations without ano
 
 test('python-rest runs only the four starter conformance files serially and the remainder in parallel', () => {
   const block = job('test-python');
+  expect(block).toContain("python-standalone-browser: ${{ matrix.group == 'python-rest' }}");
   expect(block).toContain(`      - name: Test the Python group once
         run: |
           if [ "$GALAXIE_TEST_GROUP" = "python-rest" ]; then

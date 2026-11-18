@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { chromium } from 'playwright';
+import { chromium } from 'playwright-core';
 import { preview } from 'vite';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { cspHeader } from '../../examples/adk-recipes/src/host/csp.js';

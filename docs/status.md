@@ -1,5 +1,26 @@
 # Project status
 
+On 2026-11-18, the Pyodide adapter stops aborting its source-download signal
+after successful reads. A chunked response in the generated LangGraph Python
+gateway app reproduced `net::ERR_ABORTED` on `graph.py` in 11 of 40 instrumented
+Chromium drives. Both Python bodies reached EOF before the adapter aborted the
+signal, and the lesson still reached its question. Twenty-one ordinary local
+clean-PATH tarball runs passed before the fix. A second controlled fixture
+delivers EOF after the last bytes have been read. On Chromium 156 a fully read
+`no-store` response was reported as cancelled even with live fetch signals, with
+or without the adapter fix. On Chromium 158 the adapter abort alone did not
+reproduce a failed request in that fixture, so there its test pins the live
+signals directly. The LangGraph Python standalone drives, the Python starter
+browser tests and the gateway conformance use Chromium 158 from Playwright Core
+1.65.0. Which of the two causes produced the failures in CI is inferred from
+these local runs: the CI log redacted the file name, and the stress fixture
+that produced the 11 of 40 and 40 of 40 counts is not committed. The same
+stress drive passed 40 of 40 runs with both changes. Ten clean-PATH
+gateway runs and two browser-only runs also passed with npm and pnpm tarballs.
+The adapter still cancels pending sibling downloads on failure and keeps the
+deadline and host cancellation. The failed-request gate and ADR-0012 guarantees
+are unchanged. See [Chromium issue 568852319](https://issues.chromium.org/issues/568852319).
+
 On 2026-11-18, create tarball mode adds pnpm 11 workspace overrides and Yarn 4
 resolutions. Bun and unknown managers fail before any write. The standalone
 harness checks both managers' effective release-age policy and lockfile

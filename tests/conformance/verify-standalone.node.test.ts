@@ -1272,6 +1272,7 @@ it.each([
     framework: fixtureSpec.framework,
     kind,
   })),
+  { framework: 'langgraph-python', kind: 'pass' as const },
   ...['langgraph-js', 'adk-js', 'adk-go', 'langgraph-python'].flatMap((framework) =>
     (['probe', 'probe-short'] as const).map((kind) => ({ framework, kind })),
   ),
@@ -1310,8 +1311,12 @@ it.each([
           { action: 'text', name: 'Finished' },
         ],
       });
-      if (kind === 'pass') expect(await drive).toMatch(/\d+\./);
-      else if (kind === 'probe' || kind === 'probe-short')
+      if (kind === 'pass') {
+        const browser = await drive;
+        expect(browser).toMatch(/\d+\./);
+        if (framework === 'langgraph-python')
+          expect(Number(browser.split('.')[0])).toBeGreaterThanOrEqual(157);
+      } else if (kind === 'probe' || kind === 'probe-short')
         await expect(drive).rejects.toThrow(
           'Trusted Types probe: configure zod jitless before the application schemas.',
         );

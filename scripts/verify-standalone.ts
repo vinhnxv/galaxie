@@ -4,7 +4,7 @@
 import { writeFile } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Request } from 'playwright';
+import type { ConsoleMessage, Request, Response } from 'playwright';
 import type { PackageManager } from '../packages/create/src/packages.js';
 import type { Mode, NodeRequest, Result, Step, TemplateSpec } from './standalone-core.js';
 
@@ -23,7 +23,11 @@ export interface Arguments {
   serverBudgetMinutes: number;
   help: boolean;
 }
-export const usage = `Usage: node scripts/verify-standalone.ts [options]
+
+const installChromium = 'pnpm exec playwright install --no-remove chromium';
+const installPythonChromium = 'pnpm exec playwright-core install --no-remove --only-shell chromium';
+
+export const usage: string = `Usage: node scripts/verify-standalone.ts [options]
   --kind browser-only|gateway|all             (default all)
   --framework langgraph-js|adk-js|adk-go|langgraph-python
                                             (default langgraph-js; others are tarball-only)
@@ -40,7 +44,8 @@ export const usage = `Usage: node scripts/verify-standalone.ts [options]
   --help
 Node versions are never downloaded. Missing Node 22: nvm install 22.
 Packing needs pnpm on PATH and this workspace's installed build tooling.
-Chromium: pnpm exec playwright install chromium.`;
+Chromium: ${installChromium}.
+LangGraph Python Chromium: ${installPythonChromium}.`;
 
 export function parseArguments(args: readonly string[]): Arguments {
   const options: Arguments = {
@@ -232,12 +237,27 @@ function redactRequestPath(url: string): string {
   return '<path redacted>';
 }
 
+type DriveRequest = Pick<Request, 'url' | 'failure'>;
+type DriveResponse = Pick<Response, 'status' | 'url'> & { request(): DriveRequest };
+interface DriveEvents {
+  on(event: 'pageerror', listener: () => void): void;
+  on(event: 'request', listener: (request: DriveRequest) => void): void;
+  on(event: 'requestfailed', listener: (request: DriveRequest) => void): void;
+  on(event: 'response', listener: (response: DriveResponse) => void): void;
+  on(
+    event: 'console',
+    listener: (message: Pick<ConsoleMessage, 'type' | 'text' | 'location'>) => void,
+  ): void;
+}
+
 export async function driveChromium(
   url: string,
   spec: TemplateSpec,
   signal?: AbortSignal,
 ): Promise<string> {
-  const { chromium } = await import('playwright');
+  // The bundled Chromium 156 can cancel a fully read no-store response in DevTools.
+  const python = spec.framework === 'langgraph-python';
+  const { chromium } = python ? await import('playwright-core') : await import('playwright');
   let browser: Awaited<ReturnType<typeof chromium.launch>>;
   try {
     browser = await chromium.launch({
@@ -247,7 +267,9 @@ export async function driveChromium(
       args: ['--disable-gpu', '--disable-webgpu'],
     });
   } catch {
-    throw new Error('Chromium unavailable; run pnpm exec playwright install chromium.');
+    throw new Error(
+      `Chromium unavailable; run ${python ? installPythonChromium : installChromium}.`,
+    );
   }
   const abort = (): void => {
     void browser.close();
@@ -267,8 +289,8 @@ export async function driveChromium(
       if (errors.length < 16) errors.push(message);
     };
     let activity = 'navigation';
-    const requests = new WeakMap<Request, { step: string; start: number }>();
-    const requestError = (request: Request, reason: string): void => {
+    const requests = new WeakMap<DriveRequest, { step: string; start: number }>();
+    const requestError = (request: DriveRequest, reason: string): void => {
       if (requestErrors.length >= 16) return;
       const now = performance.now();
       const { step, start } = requests.get(request) ?? { step: activity, start: now };
@@ -292,15 +314,16 @@ export async function driveChromium(
     });
     const page = await context.newPage();
     page.setDefaultTimeout(15000);
-    page.on('pageerror', () => addError('Page error.'));
-    page.on('request', (request) => {
+    const events: DriveEvents = page;
+    events.on('pageerror', () => addError('Page error.'));
+    events.on('request', (request) => {
       requests.set(request, { step: activity, start: performance.now() });
     });
-    page.on('requestfailed', (request) => {
+    events.on('requestfailed', (request) => {
       const code = request.failure()?.errorText ?? '';
       requestError(request, /^net::ERR_[A-Z0-9_]{1,48}$/.test(code) ? code : 'Request failed');
     });
-    page.on('response', (response) => {
+    events.on('response', (response) => {
       const status = response.status();
       if (status < 400) return;
       if (expected !== undefined && status === 503) {
@@ -312,7 +335,7 @@ export async function driveChromium(
       }
       requestError(response.request(), `HTTP status ${status}`);
     });
-    page.on('console', (message) => {
+    events.on('console', (message) => {
       if (message.type() !== 'error') return;
       if (
         expected !== undefined &&
