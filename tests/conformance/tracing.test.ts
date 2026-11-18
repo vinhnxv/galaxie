@@ -1230,7 +1230,10 @@ test('AT-36 root text treats unlabelled start strings as private without changin
   const patterned = await rootTextScenario({
     ...options,
     inputSchema: z.union([
-      z.string().startsWith('at36-').meta(galaxieField({ label: 'app' })),
+      z
+        .string()
+        .startsWith('at36-')
+        .meta(galaxieField({ label: 'app' })),
       z.string().startsWith('alternate-'),
     ]),
   });
