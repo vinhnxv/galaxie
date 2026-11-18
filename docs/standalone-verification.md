@@ -10,6 +10,13 @@ production server still follows the correlated 503 unavailable flow. These check
 use no Built-in AI, WebGPU or upstream model. Earlier records below predate the
 gateway mock.
 
+The Chromium drive allows zero Trusted Types probe errors for each framework
+(`langgraph-js`, `adk-js`, `adk-go` and `langgraph-python`). Both JavaScript
+starters configure Zod before creating the application's schemas. The Go and
+Python framework layers configure Zod during bundling, and the starter browser
+tests require zero policy violations and zero errors on their successful mock
+drives.
+
 ## Release preparation (2026-11-17)
 
 All thirteen public packages are prepared at 0.2.0; nothing is published by this
@@ -450,7 +457,7 @@ The original driver also rejected the documented Trusted Types eval probe and th
 
 ## Plan deviations
 
-The delegated retry decision allows one additional diagnostic class: a Chromium resource-load 503 console error only during the deliberate hybrid unavailable step, correlated by its exact URL with a response event observed in that step at `/api/v1/chat/completions` with status 503. All other console errors, page errors, failed requests and HTTP errors fail. Offline Chromium controls cover a correlated pass, an uncorrelated diagnostic, another path, status 500, an error outside the step and a failed request. The Trusted Types probe is allowed at most once, with either exact Chromium wording of the documented probe.
+The delegated retry decision allows one additional diagnostic class: a Chromium resource-load 503 console error only during the deliberate hybrid unavailable step, correlated by its exact URL with a response event observed in that step at `/api/v1/chat/completions` with status 503. Offline Chromium controls cover a correlated pass, an uncorrelated diagnostic, another path, status 500, an error outside the step and a failed request. The characterization allowed one Trusted Types probe with either exact Chromium wording. The current driver fails on the first such error for every framework.
 
 The workspace build is the necessary exception to the plan's blanket temporary-write wording: `build:packages` writes ordinary ignored package outputs in the checkout before packing. Copied installs, tarballs, cache and npm configuration stay in the owned temporary root; requested JSON/log evidence stays outside the checkout. No user configuration is modified.
 

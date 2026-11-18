@@ -257,7 +257,6 @@ export async function driveChromium(
         `Drive ${step}: ${diagnosticPath(request.url())} — ${reason} (${Math.round(now - start)} ms)`,
       );
     };
-    let probes = 0;
     let expected: Step['unavailable'];
     const responses = new Set<string>();
     const diagnostics = new Set<string>();
@@ -296,13 +295,6 @@ export async function driveChromium(
     });
     page.on('console', (message) => {
       if (message.type() !== 'error') return;
-      if (
-        (message.text() === "This document requires 'TrustedScript' assignment." ||
-          message.text() ===
-            "This document requires 'TrustedScript' assignment. The action has been blocked.") &&
-        probes++ === 0
-      )
-        return;
       if (
         expected !== undefined &&
         /^Failed to load resource: the server responded with a status of 503(?: \(Service Unavailable\))?$/.test(

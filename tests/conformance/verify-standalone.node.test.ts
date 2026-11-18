@@ -912,16 +912,16 @@ it.each(['old-npm', 'ignored-policy', 'effective-policy'] as const)(
 );
 
 it.each([
-  'pass',
-  'probe',
-  'probe-short',
-  'external',
-  'pageerror',
-  'console',
-  'probe-twice',
-] as const)(
-  'drives real Chromium offline and detects forbidden behavior (%s)',
-  async (kind) => {
+  ...(['pass', 'external', 'pageerror', 'console', 'probe-twice'] as const).map((kind) => ({
+    framework: fixtureSpec.framework,
+    kind,
+  })),
+  ...['langgraph-js', 'adk-js', 'adk-go', 'langgraph-python'].flatMap((framework) =>
+    (['probe', 'probe-short'] as const).map((kind) => ({ framework, kind })),
+  ),
+])(
+  'drives real Chromium offline and detects forbidden behavior ($framework, $kind)',
+  async ({ framework, kind }) => {
     const server = createServer((_request, response) => {
       response.setHeader('content-type', 'text/html');
       const bad = {
@@ -945,6 +945,7 @@ it.each([
     try {
       const drive = driveChromium(`http://127.0.0.1:${address.port}`, {
         ...fixtureSpec,
+        framework,
         build: [],
         preview: [],
         steps: [
@@ -953,8 +954,9 @@ it.each([
           { action: 'text', name: 'Finished' },
         ],
       });
-      if (kind === 'pass' || kind === 'probe' || kind === 'probe-short')
-        expect(await drive).toMatch(/\d+\./);
+      if (kind === 'pass') expect(await drive).toMatch(/\d+\./);
+      else if (kind === 'probe' || kind === 'probe-short')
+        await expect(drive).rejects.toThrow('Console error.');
       else await expect(drive).rejects.toThrow(/Cross-origin|Page error|Console error/);
     } finally {
       server.closeAllConnections();
