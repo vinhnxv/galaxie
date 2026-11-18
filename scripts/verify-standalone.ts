@@ -18,6 +18,7 @@ export interface Arguments {
   keep: boolean;
   cleanPath: boolean;
   budgetMinutes: number;
+  serverBudgetMinutes: number;
   help: boolean;
 }
 export const usage = `Usage: node scripts/verify-standalone.ts [options]
@@ -31,7 +32,8 @@ export const usage = `Usage: node scripts/verify-standalone.ts [options]
   --min-release-age-exclude <pattern>       explicit, recorded npm exclusion
   --keep                                  retain and print the temporary root
   --clean-path                            project PATH contains only node and sh
-  --budget-minutes <n>                     per-project budget, integer 1 to 60 (default 10)
+  --budget-minutes <n>                     scaffold through preview, integer 1 to 60 (default 10)
+  --server-budget-minutes <n>              gateway compile and drive, integer 1 to 60 (default 2)
   --help
 Node versions are never downloaded. Missing Node 22: nvm install 22.
 Packing needs pnpm on PATH and this workspace's installed build tooling.
@@ -46,6 +48,7 @@ export function parseArguments(args: readonly string[]): Arguments {
     keep: false,
     cleanPath: false,
     budgetMinutes: 10,
+    serverBudgetMinutes: 2,
     help: false,
   };
   const invalid: () => never = () => {
@@ -103,11 +106,13 @@ export function parseArguments(args: readonly string[]): Arguments {
       case '--min-release-age-exclude':
         options.exclude = value;
         break;
-      case '--budget-minutes': {
+      case '--budget-minutes':
+      case '--server-budget-minutes': {
         const minutes = Number(value);
         if (!/^\d+$/.test(value) || !Number.isInteger(minutes) || minutes < 1 || minutes > 60)
           invalid();
-        options.budgetMinutes = minutes;
+        if (flag === '--budget-minutes') options.budgetMinutes = minutes;
+        else options.serverBudgetMinutes = minutes;
         break;
       }
       default:
@@ -197,7 +202,7 @@ export const templateSpecs: readonly TemplateSpec[] = [
   ),
 ];
 
-function diagnosticPath(url: string): string {
+function redactRequestPath(url: string): string {
   const { pathname } = new URL(url);
   if (
     pathname === '/' ||
@@ -208,7 +213,6 @@ function diagnosticPath(url: string): string {
     pathname === '/python/runtime/pyodide.asm.wasm'
   )
     return pathname;
-  // Unknown path segments can contain credentials or absolute file paths.
   for (const prefix of ['/assets/', '/python/runtime/', '/python/wheels/', '/python/agent/'])
     if (pathname.startsWith(prefix)) return `${prefix}<file>`;
   return '<path redacted>';
@@ -237,6 +241,7 @@ export async function driveChromium(
   signal?.addEventListener('abort', abort, { once: true });
   try {
     signal?.throwIfAborted();
+    const origin = URL.parse(url)?.origin;
     const context = await browser.newContext({ serviceWorkers: 'block' });
     await context.addInitScript(
       "Object.defineProperty(globalThis, 'LanguageModel', { configurable: true, value: undefined }); Object.defineProperty(navigator, 'gpu', { configurable: true, value: undefined });",
@@ -254,7 +259,7 @@ export async function driveChromium(
       const now = performance.now();
       const { step, start } = requests.get(request) ?? { step: activity, start: now };
       requestErrors.push(
-        `Drive ${step}: ${diagnosticPath(request.url())} — ${reason} (${Math.round(now - start)} ms)`,
+        `Drive ${step}: ${redactRequestPath(request.url())} — ${reason} (${Math.round(now - start)} ms)`,
       );
     };
     let expected: Step['unavailable'];
@@ -266,7 +271,7 @@ export async function driveChromium(
       );
     };
     await context.route('**/*', async (route) => {
-      if (new URL(route.request().url()).origin !== new URL(url).origin) {
+      if (new URL(route.request().url()).origin !== origin) {
         external++;
         await route.abort('blockedbyclient');
       } else await route.continue();
@@ -282,16 +287,16 @@ export async function driveChromium(
       requestError(request, /^net::ERR_[A-Z0-9_]{1,48}$/.test(code) ? code : 'Request failed');
     });
     page.on('response', (response) => {
-      if (response.status() < 400) return;
-      const target = new URL(response.url());
-      if (
-        expected !== undefined &&
-        response.status() === 503 &&
-        target.origin === new URL(url).origin &&
-        target.pathname === expected.path
-      )
-        responses.add(response.url());
-      else requestError(response.request(), `HTTP status ${response.status()}`);
+      const status = response.status();
+      if (status < 400) return;
+      if (expected !== undefined && status === 503) {
+        const target = new URL(response.url());
+        if (target.origin === origin && target.pathname === expected.path) {
+          responses.add(response.url());
+          return;
+        }
+      }
+      requestError(response.request(), `HTTP status ${status}`);
     });
     page.on('console', (message) => {
       if (message.type() !== 'error') return;
@@ -308,37 +313,38 @@ export async function driveChromium(
     });
     try {
       const response = await page.goto(url);
-      if (response?.status() !== 200) {
+      const navigated = response?.status() === 200;
+      if (!navigated) {
         if (response !== null && response.status() < 400)
           requestError(response.request(), `HTTP status ${response.status()}`);
         addError('Page did not return 200.');
-      } else {
-        for (const [index, step] of spec.steps.entries()) {
-          activity = `step ${index + 1} (${step.action})`;
-          expected = step.unavailable;
-          if (step.action === 'text') await page.getByText(step.name, { exact: true }).waitFor();
-          else {
-            if (step.role === undefined) {
-              addError('Missing step role.');
-              break;
-            }
-            const locator = page.getByRole(step.role, { name: step.name, exact: true });
-            if (step.action === 'check') await locator.check();
-            else if (step.action === 'click') await locator.click();
-            else await locator.waitFor();
+      }
+      const steps = navigated ? spec.steps : [];
+      for (const [index, step] of steps.entries()) {
+        activity = `step ${index + 1} (${step.action})`;
+        expected = step.unavailable;
+        if (step.action === 'text') await page.getByText(step.name, { exact: true }).waitFor();
+        else {
+          if (step.role === undefined) {
+            addError('Missing step role.');
+            break;
           }
-          if (expected !== undefined) {
-            await page.getByText(expected.text, { exact: true }).waitFor();
-            await flush();
-            if (responses.size === 0) addError('Expected HTTP status 503 was not observed.');
-            for (const diagnostic of diagnostics)
-              if (!responses.has(diagnostic))
-                addError('Console error: uncorrelated HTTP status 503.');
-            responses.clear();
-            diagnostics.clear();
-          }
-          expected = undefined;
+          const locator = page.getByRole(step.role, { name: step.name, exact: true });
+          if (step.action === 'check') await locator.check();
+          else if (step.action === 'click') await locator.click();
+          else await locator.waitFor();
         }
+        if (expected !== undefined) {
+          await page.getByText(expected.text, { exact: true }).waitFor();
+          await flush();
+          if (responses.size === 0) addError('Expected HTTP status 503 was not observed.');
+          for (const diagnostic of diagnostics)
+            if (!responses.has(diagnostic))
+              addError('Console error: uncorrelated HTTP status 503.');
+          responses.clear();
+          diagnostics.clear();
+        }
+        expected = undefined;
       }
       await flush();
     } catch {
@@ -360,7 +366,7 @@ export function renderResults(results: readonly Result[]): string {
   return results
     .map(
       (result) =>
-        `${result.template} | ${result.node} | npm ${result.npm} | ${result.mode} | ${result.failures.some((failure) => failure.gating || failure.source === 'unclassified') ? 'FAIL' : 'PASS'} | ${result.durationMs} ms | release age ${result.releaseAgeDays}d${result.exclude === null ? '' : `; exclusion ${result.exclude}`}\n${result.failures.map((failure) => `  ${failure.phase} [${failure.source}]${failure.gating ? '' : ' (advisory)'}: ${failure.summary}\n${failure.excerpt}`).join('\n')}`,
+        `${result.template} | ${result.node} | npm ${result.npm} | ${result.mode} | ${result.failures.some((failure) => failure.gating || failure.source === 'unclassified') ? 'FAIL' : 'PASS'} | ${result.durationMs} ms${result.serverDurationMs === null ? '' : ` | server ${result.serverDurationMs} ms`} | release age ${result.releaseAgeDays}d${result.exclude === null ? '' : `; exclusion ${result.exclude}`}\n${result.failures.map((failure) => `  ${failure.phase} [${failure.source}]${failure.gating ? '' : ' (advisory)'}: ${failure.summary}\n${failure.excerpt}`).join('\n')}`,
     )
     .join('\n');
 }
@@ -395,6 +401,7 @@ if (import.meta.main) {
           keep: options.keep,
           cleanPath: options.cleanPath,
           budgetMinutes: options.budgetMinutes,
+          serverBudgetMinutes: options.serverBudgetMinutes,
         },
         {
           scaffold: async ({ spec, directory, tarballs, node, env, signal, runner }) => {

@@ -111,10 +111,17 @@ Packing, cleanup and the gateway's later compiled-server 503 drive are outside
 that interval. The ADK Go edited-source control described below is also excluded.
 The default budget is 10 minutes per project; `--budget-minutes` accepts integers
 from 1 to 60. An overrun adds a gating `budget` failure with the summary
-`budget exceeded: <measured> ms of <allowed> ms`. The elapsed-time gate is
-evaluated after the project run. Each CI leg also has a 45-minute job timeout.
-JSON results are printed to the job log and
-per-project durations are written to the job summary.
+`budget exceeded: <measured> ms of <allowed> ms`.
+
+Gateway results also record `serverDurationMs` from the start of TypeScript
+compilation through the compiled server's session probe and Chromium 503 drive,
+or to the point where that leg fails. The field is `null` if the leg never
+started. Cleanup is outside this interval. `--server-budget-minutes` accepts
+integers from 1 to 60 and defaults to 2. An overrun adds a gating `budget` failure
+with `server budget exceeded: <measured> ms of <allowed> ms`. Both elapsed-time
+gates are evaluated after the project run. Each CI leg also has a 45-minute job
+timeout. JSON results are printed to the job log, and scaffold-to-preview
+durations are written to the job summary.
 
 The scope output skips this job only for a non-empty documents-only change list
 (Markdown, paths under `docs/`, or `llms.txt`); other changes and unknown/empty
@@ -599,7 +606,8 @@ and wiring result, not a model-quality or device-performance measurement.
 
 The JSON output is an array of results: `template`, verified `node` (or the requested
 major if version resolution fails), exact `npm` (or `unknown` before its probe),
-`mode`, `releaseAgeDays`, `exclude`, `browser`, `durationMs` and `failures`. Each failure contains
+`mode`, `releaseAgeDays`, `exclude`, `browser`, `durationMs`, `serverDurationMs`
+and `failures`. Each failure contains
 `phase`, `gating`, `source`, `suggested`, `summary` and `excerpt`; the parent result
 supplies the combination/node/mode identity. Current phases are node, pack,
 scaffold, install, build, check, negative-control, compile, serve, drive, probe and budget.

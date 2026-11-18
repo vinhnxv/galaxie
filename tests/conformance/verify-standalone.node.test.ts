@@ -349,6 +349,8 @@ it('parses the documented CLI forms and refuses malformed or unknown arguments',
       '--clean-path',
       '--budget-minutes',
       '1',
+      '--server-budget-minutes',
+      '3',
     ]),
   ).toMatchObject({
     nodes: [{ major: 22, path: '/p' }, { major: 24 }],
@@ -357,8 +359,13 @@ it('parses the documented CLI forms and refuses malformed or unknown arguments',
     keep: true,
     cleanPath: true,
     budgetMinutes: 1,
+    serverBudgetMinutes: 3,
   });
-  expect(parseArguments([])).toMatchObject({ cleanPath: false, budgetMinutes: 10 });
+  expect(parseArguments([])).toMatchObject({
+    cleanPath: false,
+    budgetMinutes: 10,
+    serverBudgetMinutes: 2,
+  });
   expect(parseArguments(['--help']).help).toBe(true);
   for (const args of [
     ['--wat'],
@@ -369,6 +376,8 @@ it('parses the documented CLI forms and refuses malformed or unknown arguments',
     ['--mode', 'missing'],
     ['--budget-minutes'],
     ...['0', '61', 'x', '1.5', '-1', 'Infinity'].map((value) => ['--budget-minutes', value]),
+    ['--server-budget-minutes'],
+    ...['0', '61', 'x', '1.5', '-1', 'Infinity'].map((value) => ['--server-budget-minutes', value]),
   ])
     expect(() => parseArguments(args)).toThrow('Usage');
   expect(templateSpecs.map(({ name, kind, framework }) => ({ name, kind, framework }))).toEqual([
@@ -402,6 +411,7 @@ it('renders every phase and source and preserves the JSON result shape', () => {
     exclude: null,
     browser: null,
     durationMs: 1234,
+    serverDurationMs: null,
     failures: [
       {
         phase: 'build' as const,
@@ -592,6 +602,7 @@ it.each(['within', 'exact', 'over', 'failed'] as const)(
       for (const result of results) {
         expect(result.durationMs).toBe(elapsed);
         expect(JSON.parse(JSON.stringify(result)).durationMs).toBe(elapsed);
+        expect(result.serverDurationMs).toBeNull();
         if (kind === 'within' || kind === 'exact') expect(result.failures).toEqual([]);
         else
           expect(result.failures.filter(({ phase }) => phase === 'budget')).toEqual([
@@ -625,9 +636,116 @@ it.each(['within', 'exact', 'over', 'failed'] as const)(
   },
 );
 
-it.each(['go', 'python', 'python3', 'uv'])(
+it.each([
+  { kind: 'within', elapsed: 59_999, limit: 1 },
+  { kind: 'exact', elapsed: 60_000, limit: 1 },
+  { kind: 'over', elapsed: 60_001, limit: 1 },
+  { kind: 'compile failure', elapsed: 40_000, limit: 1 },
+  { kind: 'drive failure', elapsed: 60_001, limit: 1 },
+  { kind: 'default exact', elapsed: 120_000 },
+  { kind: 'default over', elapsed: 120_001 },
+])('measures and gates the compiled gateway leg independently ($kind)', async (fixture) => {
+  const root = await temporary();
+  const repo = join(root, 'repo');
+  await mkdir(repo);
+  await writeFile(join(repo, 'pnpm-workspace.yaml'), 'minimumReleaseAge: 10080');
+  const server = createServer((_request, response) => response.end('ready'));
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  if (address === null || typeof address === 'string') throw new Error('No fixture port.');
+  let elapsed = 0;
+  const drive = vi.fn(async (_url: string, spec: TemplateSpec) => {
+    if (spec.steps[0]?.name === 'compiled') {
+      elapsed += fixture.elapsed - 50_000;
+      if (fixture.kind === 'drive failure') throw new Error('drive-canary');
+    } else elapsed += 1_000;
+    return 'fixture-browser';
+  });
+  try {
+    const results = await runStandalone(
+      {
+        repo,
+        tempBase: root,
+        nodes: [{ major: Number(process.versions.node.split('.')[0]) }],
+        modes: ['registry'],
+        specs: [
+          {
+            ...fixtureSpec,
+            kind: 'gateway',
+            server: {
+              compile: ['compile.cjs'],
+              entry: 'server.cjs',
+              port: address.port,
+              steps: [{ action: 'text', name: 'compiled' }],
+            },
+          },
+        ],
+        ...(fixture.limit === undefined ? {} : { serverBudgetMinutes: fixture.limit }),
+        verifyReleaseAge: false,
+      },
+      {
+        clock: { now: () => elapsed, sleep: async () => {} },
+        scaffold: async ({ directory }) => {
+          await mkdir(directory);
+          await writeFile(join(directory, 'package.json'), '{}');
+          await writeBaseline(directory);
+        },
+        runner: {
+          run: async ({ args, cwd }) => {
+            if (args[0] === '--version') return process.version;
+            if (args.includes('--version')) return '12.2.2';
+            if (args.includes('check')) {
+              const source = await readFile(join(cwd, 'src/csp.ts'), 'utf8');
+              if (source.includes('unsafe-inline')) throw new Error('script-src changed');
+              if (source !== fixtureCsp) throw new Error('require-trusted-types-for changed');
+            }
+            if (args[0] === 'compile.cjs') {
+              elapsed += 40_000;
+              if (fixture.kind === 'compile failure') throw new Error('compile-canary');
+            }
+            return '';
+          },
+          start: async () => ({
+            stop: async () => {
+              elapsed += 5_000;
+            },
+            output: () => '',
+          }),
+        },
+        ports: {
+          find: async (preferred) => {
+            if (preferred !== undefined) elapsed += 10_000;
+            return address.port;
+          },
+        },
+        driver: { drive },
+      },
+    );
+    const allowed = (fixture.limit ?? 2) * 60_000;
+    const budget = `server budget exceeded: ${fixture.elapsed} ms of ${allowed} ms`;
+    const phases = [];
+    if (fixture.kind === 'compile failure') phases.push('compile');
+    if (fixture.kind === 'drive failure') phases.push('drive');
+    if (fixture.elapsed > allowed) phases.push('budget');
+    expect(results[0]).toMatchObject({ durationMs: 1_000, serverDurationMs: fixture.elapsed });
+    expect(results[0]?.failures.map(({ phase }) => phase)).toEqual(phases);
+    expect(drive).toHaveBeenCalledTimes(fixture.kind === 'compile failure' ? 1 : 2);
+    const rendered = renderResults(results);
+    expect(rendered).toContain(`server ${fixture.elapsed} ms`);
+    if (fixture.elapsed > allowed) {
+      expect(results[0]?.failures.at(-1)).toMatchObject({ gating: true, summary: budget });
+      expect(rendered).toContain(budget);
+    }
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+it.each(['go', 'python', 'python3', 'uv', 'non-executable-go'] as const)(
   'requires runtime ENOENT before scaffolding (%s)',
-  async (name) => {
+  async (kind) => {
+    const name = kind === 'non-executable-go' ? 'go' : kind;
     const root = await temporary();
     const repo = join(root, 'repo');
     await mkdir(repo);
@@ -647,11 +765,16 @@ it.each(['go', 'python', 'python3', 'uv'])(
         driver: { drive: async () => 'stub' },
         runner: {
           run: async (command) => {
+            const tool = join(command.env['PATH'] ?? '', name);
             if (command.args[0] === '-e') {
-              await symlink(process.execPath, join(command.env['PATH'] ?? '', name));
+              if (kind !== 'non-executable-go') await symlink(process.execPath, tool);
               return processRunner([process.execPath]).run(command);
             }
             if (command.args[0] === '--version') return process.version;
+            if (kind === 'non-executable-go') {
+              // Plant it before the static PATH scan, which ignores non-executable files.
+              await writeFile(tool, '#!/bin/sh\n', { mode: 0o644 });
+            }
             return '12.2.2';
           },
           start: async () => {
@@ -667,7 +790,9 @@ it.each(['go', 'python', 'python3', 'uv'])(
         {
           phase: 'probe',
           gating: true,
-          excerpt: expect.stringContaining(`Clean PATH violated: ${name}`),
+          excerpt: expect.stringContaining(
+            `Clean PATH violated: ${name} did not fail with ENOENT.`,
+          ),
         },
       ],
     });
