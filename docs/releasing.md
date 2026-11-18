@@ -69,18 +69,20 @@ sources. In a checkout, it refuses copied templates or skill assets that differ
 from the repository sources and names the cleanup command. `--version` reads
 the create package manifest in either layout. The isolated packed-create test runs
 help and a `--no-install` scaffold with only Node on PATH and compares every generated file with checkout output.
-Tarball dependency resolution supports npm only; pnpm and yarn remain refused.
+Tarball dependency resolution uses npm overrides, pnpm 11 workspace overrides
+or Yarn 4 resolutions. Bun and unknown package managers are refused before writing.
 Local tarball mode prints a notice and checks each archive manifest name and
 version against its expected package name and filename version before writing.
 
 ## Verification evidence and limits
 
-Repository `create-clean` CI covers npm tarballs for all eight kind/framework
-combinations on Ubuntu Node 24 and both LangGraph.js kinds on Node 22. The pack
+Repository `create-clean` CI covers npm and pnpm tarballs for all eight
+kind/framework combinations on Ubuntu Node 24, Yarn for browser-only LangGraph.js
+on Node 24 and npm for both LangGraph.js kinds on Node 22. The pack
 test inspects thirteen packages, and the isolated packed-create test runs help
 and scaffolding outside the checkout. [Standalone runs](standalone-verification.md)
 record local mock-backed results. New-release registry installs, real models,
-devices, pnpm/yarn tarball mode and non-Linux CI remain unverified.
+devices, Yarn on other kind/framework combinations and non-Linux CI remain unverified.
 
 ## Prepared adapters
 
@@ -127,7 +129,7 @@ or platform changes can affect output and require reviewing measurements again.
 
 Start from green `main` after the release-preparation pull request has merged.
 The release commit must have no uncommitted edits. Require green `pnpm check`, all
-five `create-clean` CI legs with `success` (not skipped), and every other CI job.
+ten `create-clean` CI jobs with `success`, and every other CI job.
 Record the Python starter license review above before beginning the whole release.
 The maintainer needs an npm account permitted to publish under `@galaxie-ai`,
 with two-factor authentication enabled. The repository is already public.

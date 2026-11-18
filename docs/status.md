@@ -1,5 +1,14 @@
 # Project status
 
+On 2026-11-18, create tarball mode adds pnpm 11 workspace overrides and Yarn 4
+resolutions. Bun and unknown managers fail before any write. The standalone
+harness checks both managers' effective release-age policy and lockfile
+resolutions. Local clean-PATH runs pass all eight pnpm combinations and Yarn
+browser-only LangGraph.js. The CI matrix adds those combinations and reports
+both preview and compiled-server durations. Registry scaffold bytes and
+composed workspace output match the previous implementation. ADR-0012
+guarantees are unchanged. See the [standalone verification record](standalone-verification.md#pnpm-and-yarn-tarball-measurements-2026-11-18).
+
 On 2026-11-18, the offline documentation check rejects literal span-attribute
 writes that bypass the tracing inventories and checks source-link line fragments
 and ranges against the target file. Temporary-copy tests detect removed guards;
@@ -145,9 +154,8 @@ breach, ADK Go edited-source refusal, scope selection and workflow structure.
 Local macOS browser-only runs reach the mock answer in 13,277 ms for LangGraph
 JavaScript and 13,108 ms for ADK Go; Linux CI timings are pending the first PR
 run. See the [clean-environment record](standalone-verification.md#clean-environment-ci).
-pnpm and yarn installs, registry mode and its scheduled run, Windows, macOS CI,
-Node versions other than 22 and 24, and real model providers remain unmeasured
-by this matrix. Nothing is published; ADR-0012 guarantees are unchanged.
+That initial npm matrix did not measure other package managers, registry mode,
+Windows, macOS CI, Node versions outside 22 and 24, or real model providers. Nothing is published; ADR-0012 guarantees are unchanged.
 
 On 2026-11-16, all eight private create kind/framework combinations gain versioned
 coding-agent guidance from [one skill source](../skills/galaxie/README.md).
@@ -247,9 +255,8 @@ for loosened directives and removed header emission. The standalone harness now
 scaffolds through the CLI and gates on those checks. Before the gateway mock, all eight registry/tarball
 cases on Node 22.23.5 and 24.15.0 pass with npm 12.2.2, including single-copy
 tarball checks, mutation rejections and mock/unavailable Chromium drives; see
-the [verification record](standalone-verification.md). pnpm/yarn tarball installs
-are refused, Windows automatic installation is skipped, and the pnpm 11 override
-location and real model/device behavior remain unmeasured. Layers stay in this
+the [verification record](standalone-verification.md). At that point tarball
+mode supported only npm, and Windows automatic installation was skipped. Layers stay in this
 checkout; publication and project-mode CI remain follow-up work.
 ADR-0031 stays Proposed; ADR-0012 guarantees are unchanged.
 

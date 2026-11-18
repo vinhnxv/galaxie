@@ -280,14 +280,14 @@ checkout layout when run from the repository.
 
 The CLI accepts a relative directory, kind and framework, with native terminal
 prompts for missing choices. It detects npm, pnpm or yarn and installs with
-`--ignore-scripts` without a shell unless installation is skipped; Windows prints
-the manual command. An absolute `GALAXIE_CREATE_PACKAGE_DIR` selects all seven
-launch tarballs and npm overrides. Tarball mode refuses pnpm and yarn until their
-installs and override locations are proven.
+`--ignore-scripts` without a shell unless installation is skipped. Yarn 4 tarball
+mode uses `--mode=skip-build`. Windows prints the manual command. An absolute
+`GALAXIE_CREATE_PACKAGE_DIR` selects local tarballs with npm overrides, pnpm 11
+workspace overrides or Yarn 4 resolutions.
 
 The [standalone harness](standalone-verification.md) scaffolds with this built CLI
 outside the checkout, installs without lifecycle scripts, builds and gates on
-`npm run check`. Two mutation controls require that check to reject loosened
+`<package-manager> run check`. Two mutation controls require that check to reject loosened
 `script-src` and `require-trusted-types-for`, restoring the original source after
 each. It retains isolated npm configuration/environment, single-copy tarball
 checks, loopback browser drives and owned-process cleanup. The real network matrix
