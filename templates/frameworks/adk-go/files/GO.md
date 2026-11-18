@@ -26,7 +26,7 @@ Symlinks in the source tree are refused. Restore the original bytes to use the p
 `go/go.mod` replaces `galaxie.invalid/galaxie` with the installed package's
 `node_modules/@galaxie-ai/starter-go/dist/go-module`. npm directories and pnpm
 symlinks are supported by the build helper. Yarn needs `nodeLinker: node-modules`;
-Bun and Windows are unsupported. Tarball installation currently supports npm only.
+Bun and Windows are unsupported. Tarball installation supports npm, pnpm 11 and Yarn 4; the standalone verification guide lists the combinations that are measured.
 
 Upgrading starter-go also upgrades that Go module. An unedited agent keeps using
 the prebuilt after a version bump only when the release's template `go/` tree is

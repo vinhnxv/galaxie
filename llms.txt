@@ -42,7 +42,7 @@ Thirteen packages are prepared for the 0.2.0 lockstep release, not yet published
 - ADK Go: the `adk-go` executor lives in the [Go adapter README](packages/adapter-go/README.md) ([ADR-0023](docs/adr/0023-google-adk-go-through-a-wasm-worker.md), Proposed): authoring surface, supported agent shapes, build command and third-party licenses; the [Go module](go/README.md) holds the sources.
 - [Go starter README](packages/starter-go/README.md): prebuilt agent, verified module sources and build helpers.
 - [Python starter README](packages/starter-python/README.md): verified LangGraph wheel inventory and redistribution review limits.
-- [Create README](packages/create/README.md): starter CLI, bundled templates and guidance, four frameworks in both kinds, npm-only tarball verification.
+- [Create README](packages/create/README.md): starter CLI, bundled templates and guidance, four frameworks in both kinds, tarball verification for npm, pnpm and Yarn.
 - [Models README](packages/models/README.md): provider subpaths, the deterministic mock and the ONNX (Transformers.js) provider's host wiring.
 - [React README](packages/react/README.md): surfaces and separate host confirmations.
 - [IndexedDB README](packages/storage-indexeddb/README.md): scoped checkpoints, recovery and storage lifecycle.

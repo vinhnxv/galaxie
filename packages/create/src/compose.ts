@@ -169,7 +169,11 @@ export function compose(layers: readonly Layer[], options: ComposeOptions): Comp
       const path = options.tarballs.get(name);
       if (path === undefined || !isAbsolute(path))
         throw new TarballError(`Expected an absolute tarball path for ${name}.`);
-      // Yarn reserves these delimiters inside file: locators.
+      // Yarn reserves these delimiters inside file: locators, and it cannot read a path with a query mark.
+      if (options.packageManager === 'yarn' && path.includes('?'))
+        throw new TarballError(
+          'Yarn cannot install from a tarball path that contains a question mark; move the tarballs to another directory.',
+        );
       const reference =
         options.packageManager === 'yarn' ? path.replace(/%|#|::/g, encodeURIComponent) : path;
       tarballOverrides[name] = `file:${reference}`;

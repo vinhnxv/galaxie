@@ -22,7 +22,7 @@ expected inventory, not authenticity if both files and trusted metadata are repl
 
 After the maintainer publishes, use `npm install @galaxie-ai/starter-python@0.2.0`. Until then, use repository-built npm tarballs. The whole lockstep release waits for the maintainer's Python license review described in the [release guide](../../docs/releasing.md#prepared-adapters), including the unmodified registry Pyodide MPL-2.0 exception.
 
-The pack test verifies distribution contents and versions; repository `create-clean` CI and local standalone runs exercise generated projects with mocks and npm tarballs. Registry installs of 0.2.0, real models, devices, pnpm/yarn tarball mode and non-Linux CI remain unverified.
+The pack test verifies distribution contents and versions; repository `create-clean` CI and local standalone runs exercise generated projects with mocks and npm tarballs. Registry installs of 0.2.0, real models, devices, Yarn tarball mode for this framework and non-Linux CI remain unverified.
 
 ## Prepare and pack
 
@@ -79,8 +79,8 @@ The framework overlay supports both kinds. Chromium acceptance and the npm
 tarball standalone harness pass with Python and uv absent from PATH; see the
 [measurement record](../../docs/standalone-verification.md). Python is trusted
 author code; no new isolation boundary is claimed.
-ADR-0012 guarantees are unchanged. Real models, Firefox/WebKit, pnpm/yarn
-standalone installs, Node 22 for this framework and Pyodide startup time are unmeasured; Ubuntu Node 24 cold runs are recorded in the standalone record.
+ADR-0012 guarantees are unchanged. Real models, Firefox/WebKit, Yarn
+standalone installs for this framework, Node 22 for this framework and Pyodide startup time are unmeasured; Ubuntu Node 24 cold runs are recorded in the standalone record.
 
 Run `pnpm exec vitest run --project node tests/conformance/starter-python-dist.node.test.ts`
 and both repository typechecks. Distribution tests use owned temporary packages

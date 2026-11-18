@@ -25,8 +25,8 @@ only the server supplies its private prompt. Dev and preview use a fixed mock
 when both upstream variables are unset. The compiled production server returns
 503 without an upstream.
 
-Only npm tarball installation on the measured Node 24 and Chromium is targeted
-by the standalone harness. Firefox/WebKit, real models, pnpm/yarn end to end,
+The standalone harness measures npm and pnpm tarball installation on Node 24 and
+Chromium for this framework. Firefox/WebKit, real models, Yarn for this framework,
 Node 22 for this framework and Pyodide startup time remain unmeasured. Ubuntu
 Node 24 cold runs are recorded in the repository standalone verification guide. Local-wheel
 reproducibility and binding the local bridge wheel to adapter versions are not

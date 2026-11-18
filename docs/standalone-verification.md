@@ -168,9 +168,11 @@ HTTP 503 without an upstream. Durations are in milliseconds.
 | pnpm 11.21.0 | langgraph-python | 11,812 | 8,849 | 3,333 |
 | Yarn 4.18.1 | langgraph-js | 13,683 | — | — |
 
-The first Linux run of the new jobs used Ubuntu 24.04 and Node 24.22.2.
-All ten `create-clean` jobs passed. The table records the pnpm and Yarn
-results from the job logs, in milliseconds. [PR #292 workflow run](https://github.com/vinhnxv/galaxie/actions/runs/44282461508)
+An earlier Linux run of the new jobs on this branch used Ubuntu 24.04 and
+Node 24.22.2. The run as a whole was cancelled after all ten `create-clean`
+jobs had passed, and the later run of the final head also passed all ten. The
+table records that earlier run's pnpm and Yarn job-log results in milliseconds,
+one observation each. [Workflow run](https://github.com/vinhnxv/galaxie/actions/runs/44282461508)
 
 | Package manager | Framework | Browser-only preview | Gateway preview | Gateway server |
 | --- | --- | ---: | ---: | ---: |

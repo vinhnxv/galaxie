@@ -528,7 +528,7 @@ it.each(['pnpm', 'yarn'] as const)(
       ).rejects.toThrow('@galaxie-ai/extra');
     } else {
       await expect(verifyText(source.replace(archiveFingerprint, '123456'))).rejects.toThrow(name);
-      await expect(verifyText(source.replace(/^  checksum:.*\n/m, ''))).rejects.toThrow(name);
+      await expect(verifyText(source.replace(/^ {2}checksum:.*\n/m, ''))).rejects.toThrow(name);
       await expect(verify({ ...lock, [registryKey]: { resolution: registryKey } })).rejects.toThrow(
         name,
       );
@@ -559,7 +559,7 @@ it.each([
         join(packed, name.replace('@galaxie-ai/', 'galaxie-ai-') + '-0.2.0.tgz'),
         archiveFixture,
       );
-    for (const proof of ['pass', 'ignored-policy', 'wrong-version'] as const) {
+    for (const proof of ['pass', 'ignored-policy', 'wrong-version', 'planted-lock'] as const) {
       const calls: string[][] = [];
       const results = await runStandalone(
         {
@@ -587,7 +587,20 @@ it.each([
                 join(tarballs ?? '', name.replace('@galaxie-ai/', 'galaxie-ai-') + '-0.2.0.tgz'),
               ]),
             );
-            await writeFile(join(directory, lockfile), stringify(managedLock(manager, archives)));
+            const lock = managedLock(manager, archives);
+            if (proof === 'planted-lock') {
+              // A lock whose first internal package no longer carries the packed archive's digest.
+              const [first] = Object.entries(
+                manager === 'pnpm' ? (lock['packages'] as object) : lock,
+              )
+                .filter(([key]) => key !== '__metadata')
+                .map(([, value]) => value);
+              const entry = first as { resolution: string | { integrity?: string } };
+              if (typeof entry.resolution === 'object')
+                entry.resolution.integrity = `sha512-${'A'.repeat(86)}==`;
+              else entry.resolution = entry.resolution.replace(/hash=[0-9a-f]+/, 'hash=ffffff');
+            }
+            await writeFile(join(directory, lockfile), stringify(lock));
           },
           driver: { drive: async () => 'stub' },
           runner: {
@@ -631,13 +644,15 @@ it.each([
                 phase: 'node',
                 excerpt: `${manager} version does not match the pinned version ${pin}.`,
               }
-            : {
-                phase: 'install',
-                excerpt: expect.stringContaining('release-age policy did not take effect'),
-              },
+            : proof === 'planted-lock'
+              ? { phase: 'install', excerpt: expect.stringContaining('Single-copy tarball check') }
+              : {
+                  phase: 'install',
+                  excerpt: expect.stringContaining('release-age policy did not take effect'),
+                },
       ]);
       expect(calls.filter(([command]) => command === 'install')).toEqual(
-        proof !== 'pass'
+        proof === 'ignored-policy' || proof === 'wrong-version'
           ? []
           : manager === 'pnpm'
             ? [

@@ -659,3 +659,25 @@ test.each(['duplicate', 'truncated'] as const)(
     expect(existsSync(join(root, 'my-app'))).toBe(false);
   },
 );
+
+test('the Yarn peer pins stay inside the peer ranges of the packages that declare them', async () => {
+  // Yarn does not install missing peers at the project root, so the composer adds these two pins.
+  const read = async (name: string): Promise<{ peerDependencies: Record<string, string> }> =>
+    JSON.parse(
+      await readFile(fileURLToPath(new URL(`../../${name}/package.json`, import.meta.url)), 'utf8'),
+    );
+  const api = (await read('core')).peerDependencies['@opentelemetry/api'];
+  const checkpoint = (await read('storage-indexeddb')).peerDependencies[
+    '@langchain/langgraph-checkpoint'
+  ];
+  const [apiMajor, apiMinor] = '1.10.0'.split('.').map(Number) as [number, number];
+  const [cpMajor, cpMinor] = '1.2.2'.split('.').map(Number) as [number, number];
+  const caret = /^\^(\d+)\.(\d+)\.\d+$/.exec(api ?? '');
+  const tilde = /^~(\d+)\.(\d+)\.\d+$/.exec(checkpoint ?? '');
+  expect(caret, String(api)).not.toBeNull();
+  expect(tilde, String(checkpoint)).not.toBeNull();
+  expect(apiMajor).toBe(Number(caret?.[1]));
+  expect(apiMinor).toBeGreaterThanOrEqual(Number(caret?.[2]));
+  expect(cpMajor).toBe(Number(tilde?.[1]));
+  expect(cpMinor).toBe(Number(tilde?.[2]));
+});

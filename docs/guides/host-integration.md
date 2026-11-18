@@ -13,7 +13,7 @@ including the three additional adapters, both artifact starters and create, are
 prepared for 0.2.0; 0.2.0 is not yet published. `eslint-plugin` and `tools-mcp`
 remain private workspace packages. Generated projects use `^0.2.0` caret ranges;
 upgrade all galaxie pins together after publication. Registry installs of 0.2.0
-are unverified; current standalone proof uses npm tarballs and mock models.
+are unverified; current standalone proof uses npm, pnpm and Yarn tarballs and mock models.
 
 For host-authored wiring in a data file, see the [host configuration guide](host-configuration.md) and its worked host-remote example.
 For a Next.js App Router host, see the [Next.js guide](nextjs.md) and its client-only mock example.

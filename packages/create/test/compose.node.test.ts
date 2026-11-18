@@ -413,3 +413,19 @@ test.each(['browser-only', 'gateway'])(
     );
   },
 );
+
+test('yarn tarball mode refuses a path with a question mark before composing', () => {
+  const tarballs = new Map([
+    ['@galaxie-ai/ui-protocol', '/packed/ui-protocol.tgz'],
+    ['@galaxie-ai/core', '/packed?dir/core.tgz'],
+    ['@galaxie-ai/adapter-kit', '/packed/adapter-kit.tgz'],
+    ['@galaxie-ai/adapter-langgraph', '/packed/adapter-langgraph.tgz'],
+    ['@galaxie-ai/models', '/packed/models.tgz'],
+    ['@galaxie-ai/storage-indexeddb', '/packed/storage-indexeddb.tgz'],
+    ['@galaxie-ai/react', '/packed/react.tgz'],
+  ]);
+  expect(() => compose(basic(), { ...options, tarballs, packageManager: 'yarn' })).toThrow(
+    'question mark',
+  );
+  expect(() => compose(basic(), { ...options, tarballs, packageManager: 'pnpm' })).not.toThrow();
+});
