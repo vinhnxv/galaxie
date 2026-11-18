@@ -1081,7 +1081,15 @@ it.each([
       });
       if (kind === 'pass') expect(await drive).toMatch(/\d+\./);
       else if (kind === 'probe' || kind === 'probe-short')
-        await expect(drive).rejects.toThrow('Console error.');
+        await expect(drive).rejects.toThrow(
+          'Trusted Types probe: configure zod jitless before the application schemas.',
+        );
+      else if (kind === 'probe-twice')
+        await expect(drive).rejects.toThrow(
+          'Trusted Types probe: configure zod jitless before the application schemas.',
+        );
+      else if (kind === 'external')
+        await expect(drive).rejects.toThrow('Cross-origin request attempts: 1.');
       else await expect(drive).rejects.toThrow(/Cross-origin|Page error|Console error/);
     } finally {
       server.closeAllConnections();
@@ -1169,6 +1177,48 @@ it.each([
   30000,
 );
 
+it('reports a failed request with its elapsed time and the step that sent it', async () => {
+  const path = '/api/v1/chat/completions';
+  const server = createServer((request, response) => {
+    if (request.url === path) {
+      setTimeout(() => {
+        response.writeHead(500);
+        response.end();
+      }, 300);
+      return;
+    }
+    response.setHeader('content-type', 'text/html');
+    response.end(
+      `<button onclick="fetch('${path}',{method:'POST'}).catch(()=>{});setTimeout(()=>{document.querySelector('p').textContent='Later'},700)">Submit answers</button><p>Waiting</p>`,
+    );
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  if (address === null || typeof address === 'string') throw new Error('No port');
+  try {
+    const diagnostic = await driveChromium(`http://127.0.0.1:${address.port}`, {
+      ...fixtureSpec,
+      build: [],
+      preview: [],
+      steps: [
+        { action: 'click', role: 'button', name: 'Submit answers' },
+        { action: 'text', name: 'Later' },
+      ],
+    }).catch((error: unknown) => String(error));
+    // The response arrives while step 2 waits, but the request belongs to step 1.
+    const match =
+      /Drive step 1 \(click\): \/api\/v1\/chat\/completions — HTTP status 500 \((\d+) ms\)/.exec(
+        diagnostic,
+      );
+    expect(match, diagnostic).not.toBeNull();
+    expect(Number(match?.[1])).toBeGreaterThanOrEqual(250);
+    expect(Number(match?.[1])).toBeLessThan(5000);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+}, 30000);
+
 it.each(['refused', '500'] as const)(
   'reports the initial Chromium navigation failure without retrying (%s)',
   async (kind) => {
@@ -1196,7 +1246,9 @@ it.each(['refused', '500'] as const)(
       expect(diagnostic).toMatch(/\(\d+ ms\)/);
       expect(diagnostic).not.toContain('fixture-navigation-canary');
       expect(diagnostic).not.toContain('127.0.0.1');
-      expect(requests).toBe(kind === 'refused' ? 0 : 1);
+      // A refused connection never reaches the server, so only the 500 case proves one request.
+      if (kind === '500') expect(requests).toBe(1);
+      expect(diagnostic).not.toContain('Drive step');
     } finally {
       if (server.listening) await close();
     }

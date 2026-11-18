@@ -110,14 +110,14 @@ If that path fails before the answer, the duration ends at the failure point.
 Packing, cleanup and the gateway's later compiled-server 503 drive are outside
 that interval. The ADK Go edited-source control described below is also excluded.
 The default budget is 10 minutes per project; `--budget-minutes` accepts integers
-from 1 to 60. An overrun adds a gating `budget` failure with the summary
+from 1 to 60. A run longer than the allowance adds a gating `budget` failure with the summary
 `budget exceeded: <measured> ms of <allowed> ms`.
 
 Gateway results also record `serverDurationMs` from the start of TypeScript
 compilation through the compiled server's session probe and Chromium 503 drive,
 or to the point where that leg fails. The field is `null` if the leg never
 started. Cleanup is outside this interval. `--server-budget-minutes` accepts
-integers from 1 to 60 and defaults to 2. An overrun adds a gating `budget` failure
+integers from 1 to 60 and defaults to 2. A leg longer than the allowance adds a gating `budget` failure
 with `server budget exceeded: <measured> ms of <allowed> ms`. Both elapsed-time
 gates are evaluated after the project run. Each CI leg also has a 45-minute job
 timeout. JSON results are printed to the job log, and scaffold-to-preview
@@ -621,8 +621,9 @@ compares failures as pass, defect, release-gap or workspace-regression.
 
 Chromium reports failed requests with the navigation or numbered drive action
 that started them, the HTTP status or browser error code and request elapsed
-time. The excerpt shows known scaffold paths, masks unknown path segments and
-omits URL origins, queries and fragments. The harness requires a successful
+time. The excerpt shows known scaffold paths, replaces any other path with
+`<path redacted>` (built asset names become `<file>`) and omits URL origins,
+queries and fragments. The harness requires a successful
 HTTP readiness response before opening Chromium. Each drive makes one initial
 navigation attempt.
 

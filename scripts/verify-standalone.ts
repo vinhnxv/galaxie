@@ -309,7 +309,12 @@ export async function driveChromium(
         diagnostics.add(message.location().url);
         return;
       }
-      addError('Console error.');
+      // Fixed text: the page's message is not echoed, and the cause is named for the operator.
+      addError(
+        message.text().startsWith("This document requires 'TrustedScript' assignment.")
+          ? 'Trusted Types probe: configure zod jitless before the application schemas.'
+          : 'Console error.',
+      );
     });
     try {
       const response = await page.goto(url);
