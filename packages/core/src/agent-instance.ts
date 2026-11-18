@@ -1268,7 +1268,9 @@ export function createAgentInstance(
               if (instrumentation.developmentTraceText !== undefined && !run.pendingRestoredText) {
                 const first = strings.next();
                 if (first.done) return;
-                // Pending inspection can finish before the paused root closes.
+                // Pending inspection can finish before the paused root closes. The flag only
+                // widens the trace-time labels of the initial segment's input, so it can
+                // suppress text but never admit it.
                 run.pendingRestoredText = true;
                 registerPrivate([first.value], run.privateValues);
               }

@@ -1238,6 +1238,50 @@ test('AT-36 root text treats unlabelled start strings as private without changin
     ]),
   });
   expectRootText(patterned.spans, ['succeeded']);
+  const literalExcluded = await rootTextScenario({
+    ...options,
+    inputSchema: z.union([z.string().meta(galaxieField({ label: 'app' })), z.literal('other')]),
+  });
+  expectRootText(literalExcluded.spans, ['succeeded', rootInput]);
+  const enumExcluded = await rootTextScenario({
+    ...options,
+    inputSchema: z.union([
+      z.string().meta(galaxieField({ label: 'app' })),
+      z.enum(['other', 'another']),
+    ]),
+  });
+  expectRootText(enumExcluded.spans, ['succeeded', rootInput]);
+  type Recursive = string | Recursive[];
+  const recursive: z.ZodType<Recursive> = z.lazy(() =>
+    z.union([z.string().meta(galaxieField({ label: 'app' })), z.array(recursive)]),
+  );
+  const recursiveLabelled = await rootTextScenario({ ...options, inputSchema: recursive });
+  expectRootText(recursiveLabelled.spans, ['succeeded', rootInput]);
+  const exclusive = await rootTextScenario({
+    ...options,
+    inputSchema: z.xor([z.string().meta(galaxieField({ label: 'app' })), z.number()]),
+  });
+  expectRootText(exclusive.spans, ['succeeded', rootInput]);
+  const exclusiveAmbiguous = await rootTextScenario({
+    ...options,
+    inputSchema: z.xor([z.string().meta(galaxieField({ label: 'app' })), z.string().min(100)]),
+  });
+  expectRootText(exclusiveAmbiguous.spans, ['succeeded']);
+  const selfReference: z.ZodType<string> = z.lazy(() =>
+    z.union([z.string().meta(galaxieField({ label: 'app' })), selfReference]),
+  );
+  const selfReferenced = await rootTextScenario({ ...options, inputSchema: selfReference });
+  expectRootText(selfReferenced.spans, ['succeeded']);
+  const intersected = await rootTextScenario({
+    ...options,
+    inputSchema: z.intersection(z.string().meta(galaxieField({ label: 'app' })), z.string()),
+  });
+  expectRootText(intersected.spans, ['succeeded', rootInput]);
+  const intersectedUnlabelled = await rootTextScenario({
+    ...options,
+    inputSchema: z.intersection(z.string(), z.string().min(1)),
+  });
+  expectRootText(intersectedUnlabelled.spans, ['succeeded']);
 });
 
 test.each(['fail', 'cancel'] as const)(

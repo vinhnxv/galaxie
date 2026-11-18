@@ -224,7 +224,7 @@ Each root attribute is a JSON string containing a one-message array with one
 `assistant`. The output omits `finish_reason`. Core checks the live labels at
 settlement, including private labels from submitted text and restored data.
 An unlabelled start string and every reply also carry `private-user` for this
-check. If the compiled schema leaves more than one possible string branch,
+check. If the compiled schema leaves any reachable unlabelled string branch,
 an unlabelled alternative also triggers this classification. Core uses the
 schema's types and literal values without rerunning string patterns or custom
 refinements. With the default policy, `private-user` suppresses trace text even
@@ -237,6 +237,9 @@ Execution and its payload accounting use their existing limits. The host
 collector owns any mapping to backend request or response fields. Backend
 readback for eligible root text is unmeasured. The object-shaped graph from the
 trace-sink measurements remains ineligible for root text.
+Root text is whatever the agent reports at the segment boundary, and
+browser-side spans can be forged by page code, so treat it as a development
+aid and never as an audit record.
 
 These opted-in messages and arguments are verbatim: agent code can put tool
 results, URLs or error text inside them. They are not redacted. galaxie adds no

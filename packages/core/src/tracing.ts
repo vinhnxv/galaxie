@@ -432,8 +432,13 @@ export function startRunTrace(
       );
       if (status === 'failed') root.setStatus({ code: SpanStatusCode.ERROR });
       if (status === 'succeeded' || status === 'waiting_input') {
-        recordRootMessage('user', input, privateInput);
-        if (status === 'succeeded') recordRootMessage('assistant', output, true);
+        // Root text is a development aid: a failure here must never keep the root open.
+        try {
+          recordRootMessage('user', input, privateInput);
+          if (status === 'succeeded') recordRootMessage('assistant', output, true);
+        } catch {
+          // The attributes stay absent.
+        }
       }
       input = undefined;
       output = undefined;
