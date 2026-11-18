@@ -8,7 +8,7 @@ issuance before real users. A third-party upstream requires destination and
 consent review even behind a proxy. The default MemorySaver loses runs on reload.
 <!-- galaxie:summary:end -->
 
-<!-- galaxie:cite path="templates/kinds/gateway/files/README.md" heading="Limits and verification" sha256="2c07159d8b53da024bf30fa5cad4889365c0c2aa8b13e5c4a2e64d9f510ce59d" -->
+<!-- galaxie:cite path="templates/kinds/gateway/files/README.md" heading="Limits and verification" sha256="4da6aa9ebaf70813b5ed458453dd17af22d5bcb50a5f40416cc8a57fc696fbe8" -->
 The demo session endpoint and in-memory stores are not production authentication
 or storage. Supply authenticated sessions, backend authorization, durable
 transactional receipts, retention, cross-process quotas and provider billing

@@ -26,7 +26,7 @@ export function createSession(
   }
 
   async function token(): Promise<string> {
-    if (ending) await ending;
+    if (ending) await ending.catch(() => undefined);
     if (session && session.expiresAt > now() + 60_000) return session.token;
     refreshing ??= (async () => {
       try {

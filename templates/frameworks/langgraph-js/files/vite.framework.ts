@@ -12,7 +12,7 @@ const config: UserConfig = {
       name: 'galaxie-starter-zod',
       transform(code, id) {
         // Configure Zod before the app imports the renderer's schemas.
-        if (id === main) return `import './zod-config.js';\n${code}`;
+        if (id === main) return { code: `import './zod-config.js';\n${code}`, map: null };
         return undefined;
       },
     },
