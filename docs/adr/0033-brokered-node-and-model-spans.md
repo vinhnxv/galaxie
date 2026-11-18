@@ -43,7 +43,9 @@ data label or exporter dependency.
   for observable LangGraph tasks and ADK agent steps. Send only a bounded,
   run-local execution ID, optional parent ID and ordinal, a declared node or
   agent name on start, and a fixed outcome on end. Use framework-declared names
-  from reviewed code and the existing name filter. Emit `galaxie.node.name`
+  from reviewed code and the existing name filter, and accept a name only if it
+  is in the set declared at prepare or in the validated agent tree. Cap the node
+  spans per segment. Emit `galaxie.node.name`
   and, when a trustworthy ordinal exists, `galaxie.node.step`. The host stamps
   receipt times.
   Ignore incomplete or ambiguous identity when choosing a parent, and omit
@@ -73,9 +75,13 @@ data label or exporter dependency.
   policy and existing public stream events unchanged.
 - **Text.** Node spans contain metadata only. For model text, when
   `RunTrace.recordsText` is true, offer a projection of validated model-request
-  message text and the final reply after validation and output checks. Pass
-  neither worker or provider envelopes nor credentials, tool arguments, tool
-  results or errors to the trace recorder. Core alone admits
+  message text and the final reply after validation and output checks. Include
+  only system, user and assistant text content: drop tool-role messages and
+  assistant tool-call parts from both input and output, and pass neither worker
+  or provider envelopes nor credentials, tool arguments, tool results or errors
+  to the trace recorder. Each encoded model text attribute follows the
+  [ADR-0032](0032-development-text-on-agent-root-spans.md) size bound and is
+  omitted whole when it is exceeded. Core alone admits
   `gen_ai.input.messages` and `gen_ai.output.messages` via the existing
   `developmentTraceText` path. The default omits text. At each write the core
   checks the live sticky labels with `inBrowserOnly` and `labelsAllow`, including
@@ -98,6 +104,9 @@ any mapping to vendor fields stay with the host collector.
   arrive after a step ended, and concurrent steps can overlap. A model or tool
   call can be timed independently, but its arrival says nothing about the start
   of the owning node. Such inference would make timing and parentage ambiguous.
+- **One run-level node span.** `adapter-adk` records a single `adk.run` node.
+  That is a cheaper interim for these families, but it carries no per-step timing
+  or parentage, so it does not close the gap for agent steps and tasks.
 - **Keep only root and capability spans.** This preserves the measured trees
   but leaves brokered model activity and token usage missing. The host already
   has the per-call evidence needed to fill that gap.
@@ -105,7 +114,11 @@ any mapping to vendor fields stay with the host collector.
 ## Consequences
 
 Both adapters share the same trace boundary. Node coverage depends on each
-framework's lifecycle hooks and the negotiated worker protocol. Unknown inner
+framework's lifecycle hooks and on a lifecycle protocol that does not exist yet:
+the Pyodide bridge has one version literal and strict closed parsers, and the Go
+bridge has no negotiation, so the follow-ups must define how the host detects
+lifecycle support. ADR-0023 keeps framework tracing off in the Go module, so its
+spans are no-ops. Unknown inner
 nodes and older worker builds can yield a shallower tree. The measured Python
 and Go rows used an in-memory exporter only. Backend classification and usage
 readback in Langfuse and MLflow, timing overhead, and coverage outside the
@@ -115,22 +128,32 @@ scripted cases remain unmeasured. See
 
 ## Verification
 
-**Follow-up — Trace brokered LangGraph Python nodes and model calls.** Connect
-content-free LangGraph task lifecycle signals in Pyodide to host `RunTrace`
-handles and instrument the host model lease path. Test in-memory span counts,
-timing and parentage, explicit correlation under concurrency, fallback to the
-root, and validated usage on both invoke and stream. Cover pauses and resumes,
-failures, cancellation, stale or duplicate signals, and default and live-label
-text omissions with credential canaries. Preserve Python outputs and public
-stream behavior.
+**Follow-up (a) — Trace brokered model calls for both families.** Instrument the
+host model lease path in `adapter-pyodide` and `serveModel` in `adapter-go` with
+`RunTrace` chat spans and validated per-response usage, parented to the segment
+root, with no protocol change. Done when: in-memory tests show one span per
+dispatched call with exact usage on invoke and stream, the existing Go tool
+scenario records two model spans and one capability span with the golden
+transcript intact, failures, cancellation and pauses settle once, default and
+live-label text omission and the model text projection and size bound hold with
+credential canaries, and Python outputs and public stream behavior are unchanged.
 
-**Follow-up — Trace brokered ADK Go agent steps and model calls.** Connect
-content-free ADK agent lifecycle signals through a compatible Go bridge and
-instrument `serveModel`. Test the two model spans and one capability span in
-the existing tool scenario, exact per-response usage and optional parenting to
-the observed agent step. Cover invoke and stream, an older worker with root
-fallback, concurrency, pauses and resumes, failures, cancellation, stale or
-duplicate signals, and opt-in and live-label text controls with credential
-canaries. Keep the capability span and golden transcript intact. Each follow-up
-can confirm emission with an in-memory exporter. Record separate backend
-readback before claiming Langfuse or MLflow classification for either family.
+**Follow-up (b) — Trace brokered LangGraph Python nodes.** Define how the host
+detects lifecycle support (a boot-reply feature flag or a bridge version change)
+and how the strict bridge parsers admit the new link field. Connect
+content-free LangGraph task lifecycle signals in Pyodide to host `RunTrace` node
+handles and link model spans to their exact step. Done when: in-memory tests show
+timing and parentage, explicit correlation under concurrency, fallback to the
+root for an older worker, stale and duplicate signals ignored, the node cap
+enforced, and pauses, resumes, failures and cancellation settled once.
+
+**Follow-up (c) — Trace brokered ADK Go agent steps.** Add compatible Go bridge
+lifecycle notifications, rebuild the WASM glue and update its pin or checksum in
+the loader, and define support detection as in (b). Done when: in-memory tests
+show observed agent-step parenting of model spans, root fallback for an older
+worker, concurrency, stale and duplicate signals, and settlement on pauses,
+resumes, failures and cancellation.
+
+Each follow-up can confirm emission with an in-memory exporter. Record separate
+backend readback before claiming Langfuse or MLflow classification for either
+family.

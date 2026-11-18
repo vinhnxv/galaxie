@@ -18,9 +18,12 @@ use them. See [mlflow-evaluation.json](../../spikes/llmops-trace-sinks/results/m
 ## Decision
 
 Core owns the text on its `invoke_agent` span. Reuse `gen_ai.input.messages`
-and `gen_ai.output.messages` from the existing development-text allowlist. Write
+and `gen_ai.output.messages`, the existing development-text keys. Write
 each as a JSON string containing a one-message array with a single `text` part.
 The input message has role `user` and the output message has role `assistant`.
+The output message omits `finish_reason`, because core observes no provider
+finish reason at the agent boundary. The follow-up checks the shape against the
+pinned convention.
 These represent the segment's agent invocation and reply. The pinned
 [OpenTelemetry agent-span conventions](https://github.com/open-telemetry/semantic-conventions-genai/blob/51a0f580f8a6ad804ca4de5e033683c6fbbe5906/docs/gen-ai/gen-ai-agent-spans.md#invoke-agent-internal-span)
 already list both keys as opt-in for an internal agent invocation. The general
@@ -33,7 +36,8 @@ metadata allowlist gains no entries.
 - The output candidate is a nonempty string from the terminal executor `output`
   event that core accepts as success, including success after resume. Paused,
   failed and cancelled segments have no output candidate. Failed and cancelled
-  segments omit both attributes. Core leaves structured values and raw stream
+  segments omit both attributes, so a trace never pairs an input with a partial
+  or error outcome. Core leaves structured values and raw stream
   data out. It never serializes an inbox or checkpoint, a pending interaction,
   an error, provider credentials or a capability envelope for root text.
 - Both attributes are absent by default. With `RuntimeOptions.developmentTraceText`,
@@ -65,15 +69,20 @@ registration and tracing credentials stay with the host.
 - **Root attributes under the existing opt-in.** Chosen because core owns the
   invocation boundary and can apply the final live labels before handing the
   root to the host's exporter.
-- **A separate text child span.** A child would need collector promotion to
-  reach trace-level fields and would add a span for text with no operation or
-  duration of its own.
+- **A separate text child span.** A child span adds a span with no operation or
+  duration of its own, and neither shape has a measured backend mapping.
 - **Keep root text absent.** This preserves the measured usage and chat-text
   scorers. Evaluators that require the trace-level request or response would
   still lack those values. Copying the first and last chat spans would conflate
   a particular model call with the agent invocation.
 
 ## Consequences
+
+The measured LangGraph scenario passes an object input and returns an object
+state. Neither qualifies as a nonempty string, so trace-level request and
+response stay empty for it. Closing `mlflow-root-io` for state-shaped graphs
+needs a separate decision, such as a labelled single-string projection. The
+text-only slice helps agents whose start input and final output are strings.
 
 The working default admits a bounded text-only slice. Structured invocations,
 resume submissions and streamed partial output remain outside that slice.
@@ -88,9 +97,13 @@ to govern the recorded content and the host's exporter.
 core capture at the segment boundary and document the root scope of the two
 existing keys. Extend AT-36 with a text-only fixture on Node and Chromium.
 Assert the exact message shape and size boundary, default omission, allowed
-destinations, text protected by browser-only or disallowed late labels,
-unlabelled text, failure, cancellation, pauses and resume. Cover UTF-8 and JSON
-escaping, credential canaries, and unchanged child spans and execution budgets.
+destinations, text suppressed by browser-only or disallowed late labels,
+unlabelled text, failure, cancellation, pauses and resume, with a fixture whose
+start input and final output are strings (the measured object-shaped scenario is
+not eligible). Cover UTF-8 and JSON
+escaping and credential canaries (a lease credential and a bearer token never
+appear in any span, while a user-typed canary appears only when the labels
+permit), and unchanged child spans and execution budgets.
 Use an in-memory exporter to verify each root independently. Before claiming
 backend support, verify that host collector readback populates trace-level
 request and response for eligible text and leaves them empty when text is
