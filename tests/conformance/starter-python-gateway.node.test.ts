@@ -35,6 +35,9 @@ describe.skipIf(!hasStarterPython())('the composed LangGraph Python gateway star
     );
     expect(graph).toMatch(/SystemMessage\(\s*content="[^"]+"/);
     expect(graph).toMatch(/model\.ainvoke\(\[\s*SystemMessage\(/);
+    const graphPath = '/python/agent/starter_agent/graph.py';
+    const graphBytes = await readFile(join(built.directory, graphPath));
+    const releaseGraph = Promise.withResolvers<void>();
     const previous = {
       PATH: process.env['PATH'],
       UPSTREAM_BASE_URL: process.env['UPSTREAM_BASE_URL'],
@@ -52,7 +55,22 @@ describe.skipIf(!hasStarterPython())('the composed LangGraph Python gateway star
       server = await preview({
         configFile: false,
         logLevel: 'silent',
-        plugins: [gatewayPlugin(devGatewayOptions())],
+        plugins: [
+          {
+            name: 'delay-python-agent-source',
+            configurePreviewServer({ middlewares }) {
+              middlewares.use(graphPath, (_request, response) => {
+                response.writeHead(200, {
+                  'Content-Security-Policy': cspHeader(),
+                  'Content-Type': 'application/octet-stream',
+                });
+                response.write(graphBytes.subarray(0, 1));
+                void releaseGraph.promise.then(() => response.end(graphBytes.subarray(1)));
+              });
+            },
+          },
+          gatewayPlugin(devGatewayOptions()),
+        ],
         build: { outDir: built.directory },
         preview: {
           host: '127.0.0.1',
@@ -75,6 +93,13 @@ describe.skipIf(!hasStarterPython())('the composed LangGraph Python gateway star
         document.addEventListener('securitypolicyviolation', (event) =>
           Reflect.get(globalThis, 'starterViolations').push(event.violatedDirective),
         );
+        const sourceSignals: (AbortSignal | null | undefined)[] = [];
+        Reflect.set(globalThis, 'starterSourceSignals', sourceSignals);
+        const fetcher = globalThis.fetch;
+        globalThis.fetch = (input, init) => {
+          if (String(input).includes('/python/agent/')) sourceSignals.push(init?.signal);
+          return fetcher(input, init);
+        };
       });
       const requests: { messages: { role: string }[]; metadata: { promptId: string } }[] = [];
       const external: string[] = [];
@@ -104,8 +129,26 @@ describe.skipIf(!hasStarterPython())('the composed LangGraph Python gateway star
         errors.push(request.failure()?.errorText ?? 'Request failed.'),
       );
       expect((await page.goto(origin))?.headers()['content-security-policy']).toBe(cspHeader());
-      await page.getByRole('button', { name: 'Start with gateway', exact: true }).click();
+      await Promise.all([
+        page.waitForResponse((response) => new URL(response.url()).pathname === graphPath),
+        page.waitForEvent(
+          'requestfinished',
+          (request) =>
+            new URL(request.url()).pathname === '/python/agent/starter_agent/__init__.py',
+        ),
+        page.getByRole('button', { name: 'Start with gateway', exact: true }).click(),
+      ]);
+      releaseGraph.resolve();
       await page.getByRole('radio', { name: '4', exact: true }).check();
+      expect(
+        await page.evaluate(() => {
+          const signals: (AbortSignal | null | undefined)[] = Reflect.get(
+            globalThis,
+            'starterSourceSignals',
+          );
+          return signals.map((signal) => signal?.aborted);
+        }),
+      ).toEqual([false, false]);
       await page.getByRole('button', { name: 'Submit answers', exact: true }).click();
       await page
         .getByText('Correct. This is a fixed reply from the mock upstream.', { exact: true })
@@ -145,6 +188,7 @@ describe.skipIf(!hasStarterPython())('the composed LangGraph Python gateway star
       expect(response.headers.get('x-galaxie-upstream')).toBeNull();
       await response.body?.cancel();
     } finally {
+      releaseGraph.resolve();
       await browser?.close();
       if (server !== undefined) {
         const listener = server.httpServer;
