@@ -306,30 +306,51 @@ function reference(label: string): string {
 function tracingKeys(source: string): Set<string> {
   const tree = ts.createSourceFile('tracing.ts', source, ts.ScriptTarget.Latest);
   const declarations = new Map<string, ts.VariableDeclaration[]>();
+  const unwrap = (node: ts.Expression): ts.Expression => {
+    let expression = node;
+    while (
+      ts.isParenthesizedExpression(expression) ||
+      ts.isAsExpression(expression) ||
+      ts.isTypeAssertionExpression(expression) ||
+      ts.isSatisfiesExpression(expression) ||
+      ts.isNonNullExpression(expression)
+    )
+      expression = expression.expression;
+    return expression;
+  };
+  const hasLiteralKey = (object: ts.ObjectLiteralExpression): boolean =>
+    object.properties.some((property) => {
+      if (ts.isSpreadAssignment(property)) {
+        const spread = unwrap(property.expression);
+        return ts.isObjectLiteralExpression(spread) && hasLiteralKey(spread);
+      }
+      const name = property.name;
+      return (
+        name !== undefined &&
+        (ts.isIdentifier(name) ||
+          ts.isStringLiteralLike(name) ||
+          (ts.isComputedPropertyName(name) && ts.isStringLiteralLike(unwrap(name.expression))))
+      );
+    });
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node)) {
-      const expression = node.expression;
+      const expression = unwrap(node.expression);
+      const property = ts.isElementAccessExpression(expression)
+        ? unwrap(expression.argumentExpression)
+        : undefined;
       const method = ts.isPropertyAccessExpression(expression)
         ? expression.name.text
-        : ts.isElementAccessExpression(expression) &&
-            ts.isStringLiteralLike(expression.argumentExpression)
-          ? expression.argumentExpression.text
+        : property !== undefined && ts.isStringLiteralLike(property)
+          ? property.text
           : undefined;
-      const argument = node.arguments[0];
+      const first = node.arguments[0];
+      const argument = first === undefined ? undefined : unwrap(first);
       if (
         (method === 'setAttribute' && argument !== undefined && ts.isStringLiteralLike(argument)) ||
         (method === 'setAttributes' &&
           argument !== undefined &&
           ts.isObjectLiteralExpression(argument) &&
-          argument.properties.some((property) => {
-            const name = property.name;
-            return (
-              name !== undefined &&
-              (ts.isIdentifier(name) ||
-                ts.isStringLiteralLike(name) ||
-                (ts.isComputedPropertyName(name) && ts.isStringLiteralLike(name.expression)))
-            );
-          }))
+          hasLiteralKey(argument))
       )
         throw new Error(`literal tracing write outside attributes()/text(): ${node.getText(tree)}`);
     }

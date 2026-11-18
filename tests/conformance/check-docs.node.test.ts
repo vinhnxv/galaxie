@@ -519,6 +519,15 @@ test.each([
   "span.setAttributes({ 'galaxie.fixture': 'value' });",
   "span.setAttributes({ ['galaxie.fixture']: 'value' });",
   "span.setAttributes({ fixture: 'value' });",
+  "span.setAttribute(('galaxie.fixture'), 'value');",
+  "span.setAttribute(('galaxie.fixture' as string)!, 'value');",
+  "span.setAttribute((<string>'galaxie.fixture'), 'value');",
+  "span.setAttribute(('galaxie.fixture' satisfies string), 'value');",
+  "(span.setAttribute)('galaxie.fixture', 'value');",
+  "span[('setAttribute')]('galaxie.fixture', 'value');",
+  "span.setAttributes(({ 'galaxie.fixture': 'value' }) as Attributes);",
+  "span.setAttributes({ ...({ ...{ 'galaxie.fixture': 'value' } } as Attributes) });",
+  "span.setAttributes({ [('galaxie.fixture' as const)]: 'value' });",
 ])('rejects a literal tracing write outside the inventory helpers: %s', (write) => {
   const root = tracingFixture();
   const source = readFileSync(join(root, tracingSourceFile), 'utf8');
@@ -529,7 +538,13 @@ test.each([
 });
 
 test('accepts tracing writes routed through the metadata and text helpers', () => {
-  expect(run(tracingFixture())).toEqual({ status: 0, output: '' });
+  const root = tracingFixture();
+  const source = readFileSync(join(root, tracingSourceFile), 'utf8');
+  writeFileSync(
+    join(root, tracingSourceFile),
+    `${source}\nspan.setAttributes((attributes({ 'galaxie.run.status': 'ok' })) as Attributes);\n`,
+  );
+  expect(run(root)).toEqual({ status: 0, output: '' });
 });
 
 test('rejects an emitted tracing key without a table entry in a temporary source copy', () => {
