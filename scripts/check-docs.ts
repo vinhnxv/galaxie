@@ -287,6 +287,15 @@ function checkLink(file: string, line: number, target: string): void {
       headingCache.set(full, anchors);
     }
     if (!anchors.has(fragment)) problem(file, line, `missing heading: ${target}`);
+  } else if (fragment.startsWith('L') && statSync(full).isFile()) {
+    const match = /^L([1-9]\d*)(?:-L([1-9]\d*))?$/.exec(fragment);
+    const start = Number(match?.[1]);
+    const end = Number(match?.[2] ?? match?.[1]);
+    const content = readFileSync(full, 'utf8');
+    const count =
+      content === '' ? 0 : content.split(/\r?\n/).length - Number(content.endsWith('\n'));
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || end < start || end > count)
+      problem(file, line, `invalid source lines: ${target}`);
   }
 }
 
@@ -298,6 +307,32 @@ function tracingKeys(source: string): Set<string> {
   const tree = ts.createSourceFile('tracing.ts', source, ts.ScriptTarget.Latest);
   const declarations = new Map<string, ts.VariableDeclaration[]>();
   const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node)) {
+      const expression = node.expression;
+      const method = ts.isPropertyAccessExpression(expression)
+        ? expression.name.text
+        : ts.isElementAccessExpression(expression) &&
+            ts.isStringLiteralLike(expression.argumentExpression)
+          ? expression.argumentExpression.text
+          : undefined;
+      const argument = node.arguments[0];
+      if (
+        (method === 'setAttribute' && argument !== undefined && ts.isStringLiteralLike(argument)) ||
+        (method === 'setAttributes' &&
+          argument !== undefined &&
+          ts.isObjectLiteralExpression(argument) &&
+          argument.properties.some((property) => {
+            const name = property.name;
+            return (
+              name !== undefined &&
+              (ts.isIdentifier(name) ||
+                ts.isStringLiteralLike(name) ||
+                (ts.isComputedPropertyName(name) && ts.isStringLiteralLike(name.expression)))
+            );
+          }))
+      )
+        throw new Error(`literal tracing write outside attributes()/text(): ${node.getText(tree)}`);
+    }
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
       const name = node.name.text;
       if (name === 'ALLOWED' || name === 'text')

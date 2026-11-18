@@ -74,6 +74,10 @@ Names and versions are also open-ended: `galaxie.app.id`, `gen_ai.agent.name`,
 Use a host-owned finite aggregation allowlist before treating any of these as
 metric labels; do not promote arbitrary observed values to labels.
 
+`galaxie.model.provider` comes from the host-owned set of provider IDs in its
+model configuration. galaxie does not prescribe that set or bound its size;
+the host decides which IDs, if any, are aggregation labels.
+
 The runtime supplies bounded vocabularies for `gen_ai.operation.name`,
 `galaxie.capability.kind`, `galaxie.destination.class`, `galaxie.output_safety`,
 `galaxie.run.labels`, `galaxie.budget.name`, `galaxie.render.status`,
@@ -622,6 +626,9 @@ attribute column with the `ALLOWED` metadata set and the `text()` helper's key
 type in core's `tracing.ts`, using the installed TypeScript 6 parser. Missing
 and unknown keys fail with their names; unknown keys also identify the table
 row. Span names, value examples and unrelated prose are excluded. The
+checker also rejects literal `setAttribute` and `setAttributes` writes that
+bypass the metadata and development-text inventories, and validates source-link
+`#L<n>` fragments and inclusive `#L<n>-L<m>` ranges against the target's lines. The
 [documentation-check tests](../../tests/conformance/check-docs.node.test.ts)
 mutate temporary source and guide copies to prove both directions of drift.
 External links are never fetched by that checker.

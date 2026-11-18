@@ -1,5 +1,11 @@
 # Project status
 
+On 2026-11-18, the offline documentation check rejects literal span-attribute
+writes that bypass the tracing inventories and checks source-link line fragments
+and ranges against the target file. Temporary-copy tests detect removed guards;
+the tracing guide identifies provider IDs as a host-owned set. No product runtime
+behavior or ADR-0012 guarantee changes, and no live stack was run.
+
 On 2026-11-17, Python starter prepack compares both local wheels' Python modules
 with their repository sources and checks metadata-input hashes recorded by the
 trusted wheel build. Older cache inventories require rebuilding; these hashes
