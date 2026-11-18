@@ -143,6 +143,7 @@ test('both kinds share agent bytes and pin the framework-aware CSP source hashes
     'src/main.tsx',
     'src/runtime.ts',
     'src/worker-policy.ts',
+    'src/zod-config.ts',
     'tsconfig.json',
     'vite.config.ts',
     'vite.framework.ts',
@@ -260,8 +261,13 @@ test('the ADK overlay preserves inventories, pins, initialization and kind neutr
     const env = Buffer.from(project.files.get('src/adk-env.ts')?.bytes ?? []).toString();
     // The runtime environment guard and jitless zod must run before the adapter is imported.
     expect(env).toMatch(
-      /z\.config\(\{ jitless: true \}\);\s*const \{ ensureAdkRuntimeEnv \} = await import\('@galaxie-ai\/adapter-adk'\);\s*ensureAdkRuntimeEnv\(\);/,
+      /import '\.\/zod-config\.js';\s*const \{ ensureAdkRuntimeEnv \} = await import\('@galaxie-ai\/adapter-adk'\);\s*ensureAdkRuntimeEnv\(\);/,
     );
+    expect(project.files.get('src/zod-config.ts')?.bytes).toEqual(
+      original.files.get('src/zod-config.ts')?.bytes,
+    );
+    const zodConfig = Buffer.from(project.files.get('src/zod-config.ts')?.bytes ?? []).toString();
+    expect(zodConfig).toMatch(/import \{ z \} from 'zod';\s*z\.config\(\{ jitless: true \}\);/);
     // The build-time control keeps prompts and replies out of ADK spans.
     const viteFramework = Buffer.from(
       project.files.get('vite.framework.ts')?.bytes ?? [],
@@ -400,32 +406,32 @@ test.each(['browser-only', 'gateway'])(
   },
 );
 
-// Non-Go rows retain pre-release main (fa936e9e) bytes, excluding documentation.
-// Go rows include verified-buffer emission and NOTICE verification.
+// JavaScript rows include early Zod configuration. Go rows include verified-buffer
+// emission and NOTICE verification.
 const existingOutputHashes: Readonly<Record<string, string>> = {
   'browser-only/langgraph-js/npm':
-    '0a877aa9100bf044cbf54c02efd7db1399e43f6478fe9f62dc403de9886b37e8',
+    'cba64628449736d17ad8a416c5a22461ee9e45d37489385dc247eceb0f8e19f9',
   'browser-only/langgraph-js/pnpm':
-    '0a877aa9100bf044cbf54c02efd7db1399e43f6478fe9f62dc403de9886b37e8',
+    'cba64628449736d17ad8a416c5a22461ee9e45d37489385dc247eceb0f8e19f9',
   'browser-only/langgraph-js/yarn':
-    '0a877aa9100bf044cbf54c02efd7db1399e43f6478fe9f62dc403de9886b37e8',
-  'browser-only/adk-js/npm': '0c76d17e9d79183065ebcfe110537c4325d07ede88fee3104fa2906bf8bac584',
-  'browser-only/adk-js/pnpm': '257f14ab732f9c93b12faef76691713d6f45f4f69ad9376f0bf7aba9043b98cd',
-  'browser-only/adk-js/yarn': '0c76d17e9d79183065ebcfe110537c4325d07ede88fee3104fa2906bf8bac584',
+    'cba64628449736d17ad8a416c5a22461ee9e45d37489385dc247eceb0f8e19f9',
+  'browser-only/adk-js/npm': 'c36f4e523545d063363f813f2634be4e421372d90fc198251483983e618d8a21',
+  'browser-only/adk-js/pnpm': 'fc9f3e46169d9bed55cbfb2f36dd8daef35578054597dc210588cb688817f8c6',
+  'browser-only/adk-js/yarn': 'c36f4e523545d063363f813f2634be4e421372d90fc198251483983e618d8a21',
   'browser-only/adk-go/npm': 'c5a51bc25f43f91a55c3709671fdd8cb446beec14fd53c0fde7bb41999ae8eb6',
   'browser-only/adk-go/pnpm': 'c5a51bc25f43f91a55c3709671fdd8cb446beec14fd53c0fde7bb41999ae8eb6',
   'browser-only/adk-go/yarn': 'c5a51bc25f43f91a55c3709671fdd8cb446beec14fd53c0fde7bb41999ae8eb6',
-  'gateway/langgraph-js/npm': '9d2fc4a02702c62283555bd63f53cc6b12eddb67887029ec020e008d848b56fc',
-  'gateway/langgraph-js/pnpm': '9d2fc4a02702c62283555bd63f53cc6b12eddb67887029ec020e008d848b56fc',
-  'gateway/langgraph-js/yarn': '9d2fc4a02702c62283555bd63f53cc6b12eddb67887029ec020e008d848b56fc',
-  'gateway/adk-js/npm': '729d706896dcbe526f4a7561c7bd9e9cad7508dc6ce3ffba34702f830ff4dc68',
-  'gateway/adk-js/pnpm': 'ddae922701ac885be0eb7fe53e0e54e53e406c637c41b5f74860cd7f09f71a1e',
-  'gateway/adk-js/yarn': '729d706896dcbe526f4a7561c7bd9e9cad7508dc6ce3ffba34702f830ff4dc68',
+  'gateway/langgraph-js/npm': 'c2ebbc2ab12b5b2f61b37ba13edd3cc3609c5dc64bd41e95bc4f432b2695441a',
+  'gateway/langgraph-js/pnpm': 'c2ebbc2ab12b5b2f61b37ba13edd3cc3609c5dc64bd41e95bc4f432b2695441a',
+  'gateway/langgraph-js/yarn': 'c2ebbc2ab12b5b2f61b37ba13edd3cc3609c5dc64bd41e95bc4f432b2695441a',
+  'gateway/adk-js/npm': 'e0611d8a4b9169b0182fcb261e48f119fc3982af85f8cfc18d55455eae17c864',
+  'gateway/adk-js/pnpm': '141434489382824aa04c3dd03f5a0c9774d17939ae90dc4c218e19654bb3da13',
+  'gateway/adk-js/yarn': 'e0611d8a4b9169b0182fcb261e48f119fc3982af85f8cfc18d55455eae17c864',
   'gateway/adk-go/npm': '8951fbfbf1313a5557da0da1e6a78e2237aeeae1f1546ca155301badc59e0da9',
   'gateway/adk-go/pnpm': '8951fbfbf1313a5557da0da1e6a78e2237aeeae1f1546ca155301badc59e0da9',
   'gateway/adk-go/yarn': '8951fbfbf1313a5557da0da1e6a78e2237aeeae1f1546ca155301badc59e0da9',
 };
-test('code and manifest outputs retain reviewed bytes except the baseline binding and two MIME entries', async () => {
+test('code and manifest outputs retain reviewed bytes except the release ranges and two MIME entries', async () => {
   const layers = await loadLayers(templates);
   for (const [combination, expected] of Object.entries(existingOutputHashes)) {
     const [kind, framework, packageManager] = combination.split('/');
