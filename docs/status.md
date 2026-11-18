@@ -13,6 +13,17 @@ and configured destinations, and verify tracing shutdown and temporary-directory
 removal after a Pyodide preparation timeout. The local offline suite passes;
 live collector/backend ingestion was not rerun.
 
+The ADK Python retry test also covers a sibling model that emits its write before
+branch failure while host approval remains pending. Attempt zero leaves one
+succeeded receipt and invalidates that approval; retry reuses write one's receipt
+and approves write two in the same Worker. Seven Node/Pyodide cases and ten
+consecutive runs of the new variant pass; receipt-replay and premature-approval
+mutations fail. The new case does not run in Chromium. Hosted Workflow admission
+and a reversed arrival with the sibling holding the shared tool lock remain
+outside this case. Cancellation-path analysis and existing native cancellation
+tests do not establish the CI-only `invalid` root cause; runtime behavior and
+ADR-0012 guarantees are unchanged.
+
 On 2026-11-17, Python starter prepack compares both local wheels' Python modules
 with their repository sources and checks metadata-input hashes recorded by the
 trusted wheel build. Older cache inventories require rebuilding; these hashes
