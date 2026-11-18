@@ -509,7 +509,7 @@ provider credential or upstream is needed.
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm exec playwright install --no-remove chromium
+pnpm exec playwright install --no-remove --only-shell chromium
 pnpm exec playwright-core install --no-remove --only-shell chromium
 pnpm exec tsc -p packages/create/tsconfig.build.json
 node scripts/verify-standalone.ts --help
@@ -517,9 +517,11 @@ node scripts/verify-standalone.ts --node 22 --node 24 --mode tarball --json /tmp
 ```
 
 LangGraph Python standalone drives and the repository's Python gateway browser
-conformance use the Chromium build pinned by `playwright-core`. It includes the
-fix for a fully read `no-store` response appearing as a cancelled request. The
-other standalone drives use the browser pinned by `playwright`. Install both
+conformance, and the Python starter browser test, use the Chromium build pinned
+by `playwright-core`. In a fixture that delivers EOF after the last bytes were
+read, Chromium 156 reported a fully read `no-store` response as cancelled and
+Chromium 158 did not. The other standalone drives and the remaining Python
+tests use the browser pinned by `playwright`. Install both
 builds before running the full `pnpm check`. See [Chromium issue 568852319](https://issues.chromium.org/issues/568852319).
 
 `--kind browser-only|gateway|all` selects kinds. `--framework langgraph-js|adk-js|adk-go|langgraph-python`

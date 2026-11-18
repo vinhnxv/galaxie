@@ -267,6 +267,23 @@ test('source preparation cancels a pending download when another source is unava
   expect(workers).toHaveLength(0);
 });
 
+test('source preparation leaves every download signal live after the bodies were read', async () => {
+  const workers: FixtureWorker[] = [];
+  const signals: AbortSignal[] = [];
+  vi.stubGlobal('fetch', async (_url: URL, { signal }: RequestInit) => {
+    if (signal == null) throw new Error('Expected a signal for the source request.');
+    signals.push(signal);
+    return new Response('def create_agent(): pass');
+  });
+  await setup(workers).prepare(
+    { ...descriptor, files: ['agent.py', 'sibling.py'] },
+    { chatModels: { model: model() } },
+    preparation,
+  );
+  expect(signals).toHaveLength(2);
+  expect(signals.map((signal) => signal.aborted)).toEqual([false, false]);
+});
+
 const offeredTools: NonNullable<ModelPayload['options']['tools']> = [
   { type: 'function', function: { name: 'double', parameters: { type: 'object' } } },
 ];

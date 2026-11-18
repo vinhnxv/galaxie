@@ -167,15 +167,16 @@ describe.skipIf(!hasStarterPython())('the composed LangGraph Python gateway star
       // Deliver EOF in its own write after Chromium has consumed the last bytes.
       releaseGraph.resolve();
       await page.getByRole('radio', { name: '4', exact: true }).check();
-      expect(
-        await page.evaluate(() => {
-          const signals: (AbortSignal | null | undefined)[] = Reflect.get(
-            globalThis,
-            'starterSourceSignals',
-          );
-          return signals.map((signal) => signal?.aborted);
-        }),
-      ).toEqual([false, false]);
+      const aborted = await page.evaluate(() => {
+        const signals: (AbortSignal | null | undefined)[] = Reflect.get(
+          globalThis,
+          'starterSourceSignals',
+        );
+        return signals.map((signal) => signal?.aborted);
+      });
+      // Every source download signal stays live after its body has been fully read.
+      expect(aborted.length).toBeGreaterThanOrEqual(1);
+      expect(aborted.every((value) => value === false)).toBe(true);
       await page.getByRole('button', { name: 'Submit answers', exact: true }).click();
       await page
         .getByText('Correct. This is a fixed reply from the mock upstream.', { exact: true })
