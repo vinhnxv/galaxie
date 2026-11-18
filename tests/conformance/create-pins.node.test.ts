@@ -261,7 +261,7 @@ test('the ADK overlay preserves inventories, pins, initialization and kind neutr
     const env = Buffer.from(project.files.get('src/adk-env.ts')?.bytes ?? []).toString();
     // The runtime environment guard and jitless zod must run before the adapter is imported.
     expect(env).toMatch(
-      /import '\.\/zod-config\.js';\s*const \{ ensureAdkRuntimeEnv \} = await import\('@galaxie-ai\/adapter-adk'\);\s*ensureAdkRuntimeEnv\(\);/,
+      /z\.config\(\{ jitless: true \}\);\s*const \{ ensureAdkRuntimeEnv \} = await import\('@galaxie-ai\/adapter-adk'\);\s*ensureAdkRuntimeEnv\(\);/,
     );
     expect(project.files.get('src/zod-config.ts')?.bytes).toEqual(
       original.files.get('src/zod-config.ts')?.bytes,
@@ -415,18 +415,18 @@ const existingOutputHashes: Readonly<Record<string, string>> = {
     '62de39323cb9cbde60966cae920689ff68c03fe4392eed81e4626d4dc8126a87',
   'browser-only/langgraph-js/yarn':
     '62de39323cb9cbde60966cae920689ff68c03fe4392eed81e4626d4dc8126a87',
-  'browser-only/adk-js/npm': '0196c35886f072ec5c82b665aafc15bf9c18fd7593af649b26c8db536befa964',
-  'browser-only/adk-js/pnpm': '569d9f8670683a56df0bf6787f9e87ec47c54b4cb3ccaa01346d4086d6a2c440',
-  'browser-only/adk-js/yarn': '0196c35886f072ec5c82b665aafc15bf9c18fd7593af649b26c8db536befa964',
+  'browser-only/adk-js/npm': '7c04bee91d33880a4b5cee861225b6fc0ef799ac6fb6fa4db3d25dd6cd879f09',
+  'browser-only/adk-js/pnpm': 'e76368cb06bfddff09e6e2948510c7a96f5e2ba037f6871d8a1f1fa41b9f968e',
+  'browser-only/adk-js/yarn': '7c04bee91d33880a4b5cee861225b6fc0ef799ac6fb6fa4db3d25dd6cd879f09',
   'browser-only/adk-go/npm': 'c5a51bc25f43f91a55c3709671fdd8cb446beec14fd53c0fde7bb41999ae8eb6',
   'browser-only/adk-go/pnpm': 'c5a51bc25f43f91a55c3709671fdd8cb446beec14fd53c0fde7bb41999ae8eb6',
   'browser-only/adk-go/yarn': 'c5a51bc25f43f91a55c3709671fdd8cb446beec14fd53c0fde7bb41999ae8eb6',
   'gateway/langgraph-js/npm': '9d1358de86faf073ecf8be8a5eb33fd3395be3a6e9477910e7de0f9cc7168f00',
   'gateway/langgraph-js/pnpm': '9d1358de86faf073ecf8be8a5eb33fd3395be3a6e9477910e7de0f9cc7168f00',
   'gateway/langgraph-js/yarn': '9d1358de86faf073ecf8be8a5eb33fd3395be3a6e9477910e7de0f9cc7168f00',
-  'gateway/adk-js/npm': '584a827a19b5155dd5af62973530e18b3a6aa0745ad6669d0703be0d2ca7a634',
-  'gateway/adk-js/pnpm': '282bcf304e5c0d756fe54c1d195bc30ecbb9008052a0a2ba78a3f6248df55070',
-  'gateway/adk-js/yarn': '584a827a19b5155dd5af62973530e18b3a6aa0745ad6669d0703be0d2ca7a634',
+  'gateway/adk-js/npm': 'dae25ba784fcf3071e82283efb2b39f9d0aaa256dd1f628db6e6d3898e439671',
+  'gateway/adk-js/pnpm': 'dca6f3f55959a17732961bdd442f5b45befb947a102846ac7d452546ef8527b0',
+  'gateway/adk-js/yarn': 'dae25ba784fcf3071e82283efb2b39f9d0aaa256dd1f628db6e6d3898e439671',
   'gateway/adk-go/npm': '8951fbfbf1313a5557da0da1e6a78e2237aeeae1f1546ca155301badc59e0da9',
   'gateway/adk-go/pnpm': '8951fbfbf1313a5557da0da1e6a78e2237aeeae1f1546ca155301badc59e0da9',
   'gateway/adk-go/yarn': '8951fbfbf1313a5557da0da1e6a78e2237aeeae1f1546ca155301badc59e0da9',
