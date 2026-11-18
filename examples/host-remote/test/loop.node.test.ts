@@ -333,8 +333,15 @@ it('declines a save without sending progress, including at a mobile width', asyn
   expect(recorded.requests['POST /api/progress'] ?? 0).toBe(0);
   expect(privateText(recorded.proxyBodies)).toBe(false);
   await assertPage(observed, origin);
+  expect(await observed.context.cookies()).toHaveLength(1);
   await observed.page.getByRole('button', { name: 'Start over', exact: true }).click();
-  await observed.page.getByRole('button', { name: 'Start', exact: true }).waitFor();
+  await expect
+    .poll(async () => observed.page.getByRole('button', { name: 'Start', exact: true }).isEnabled())
+    .toBe(true);
+  expect(observed.requests.filter(({ url }) => url.endsWith('/api/v1/session/end'))).toHaveLength(
+    1,
+  );
+  expect(await observed.context.cookies()).toEqual([]);
 }, 60_000);
 
 it('declines quiz consent before any proxy request', async () => {
