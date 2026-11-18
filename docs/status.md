@@ -4,8 +4,9 @@ On 2026-11-18, create tarball mode adds pnpm 11 workspace overrides and Yarn 4
 resolutions. Bun and unknown managers fail before any write. The standalone
 harness checks both managers' effective release-age policy and lockfile
 resolutions. Local clean-PATH runs pass all eight pnpm combinations and Yarn
-browser-only LangGraph.js. The CI matrix adds those combinations and reports
-both preview and compiled-server durations. Registry scaffold bytes and
+browser-only LangGraph.js. All ten `create-clean` jobs pass on PR #292. The
+verification record includes the observed pnpm and Yarn preview and
+compiled-server timings. Registry scaffold bytes and
 composed workspace output match the previous implementation. ADR-0012
 guarantees are unchanged. See the [standalone verification record](standalone-verification.md#pnpm-and-yarn-tarball-measurements-2026-11-18).
 

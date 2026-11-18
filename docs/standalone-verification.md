@@ -166,7 +166,19 @@ HTTP 503 without an upstream. Durations are in milliseconds.
 | pnpm 11.21.0 | adk-js | 10,673 | 6,746 | 575 |
 | pnpm 11.21.0 | adk-go | 9,511 | 6,334 | 718 |
 | pnpm 11.21.0 | langgraph-python | 11,812 | 8,849 | 3,333 |
-| Yarn 4.18.1 | langgraph-js | 14,762 | — | — |
+| Yarn 4.18.1 | langgraph-js | 13,683 | — | — |
+
+The first Linux run of the new jobs used Ubuntu 24.04 and Node 24.22.2.
+All ten `create-clean` jobs passed. The table records the pnpm and Yarn
+results from the job logs, in milliseconds. [PR #292 workflow run](https://github.com/vinhnxv/galaxie/actions/runs/44282461508)
+
+| Package manager | Framework | Browser-only preview | Gateway preview | Gateway server |
+| --- | --- | ---: | ---: | ---: |
+| pnpm 11.21.0 | langgraph-js | 12,418 | 7,936 | 673 |
+| pnpm 11.21.0 | adk-js | 14,613 | 8,361 | 759 |
+| pnpm 11.21.0 | adk-go | 11,532 | 9,065 | 942 |
+| pnpm 11.21.0 | langgraph-python | 18,644 | 13,370 | 6,039 |
+| Yarn 4.18.1 | langgraph-js | 17,088 | — | — |
 
 Registry mode, the scheduled registry run, Windows, macOS CI, Node versions
 outside 22 and 24, pnpm and Yarn on Node 22, Yarn gateway and Yarn on the other
