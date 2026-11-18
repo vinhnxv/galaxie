@@ -37,14 +37,20 @@ and ranges against the target file. Temporary-copy tests detect removed guards;
 the tracing guide identifies provider IDs as a host-owned set. No product runtime
 behavior or ADR-0012 guarantee changes, and no live stack was run.
 
-Two Proposed ADRs record the trace-sink follow-up decisions.
-[ADR-0032](adr/0032-development-text-on-agent-root-spans.md) defines gated
-development text on each eligible segment root (`galaxie-d53.7`).
+Core implements the gated root-span capture from
+[ADR-0032](adr/0032-development-text-on-agent-root-spans.md) (`galaxie-d53.11`,
+follow-up to `galaxie-d53.7`). AT-36 in-memory export on Node and headless
+Chromium checks the exact string-message shape, live labels and destinations,
+UTF-8 limits, segment settlement, credential omission and execution budgets.
+The object-shaped measured scenario still omits root text. Existing child-span
+behavior and the ADR-0012 guarantees are unchanged. Collector mapping, backend
+request and response readback, exporter limits and evaluator behavior are
+unmeasured for eligible root text. This change did not run the live stack.
+
 [ADR-0033](adr/0033-brokered-node-and-model-spans.md) defines host-side model
 spans and spans for explicitly reported LangGraph Python and ADK Go steps
 (`galaxie-d53.8`, `galaxie-d53.9`). Implementation and backend readback remain
-follow-up work. The existing attribute allowlists, runtime behavior and
-ADR-0012 guarantees are unchanged.
+follow-up work.
 
 The tracing-sink spike's score, browser and coverage result writers now use its
 local JSON serializer. Offline tests preserve all thirteen committed result
