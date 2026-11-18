@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { fileURLToPath } from 'node:url';
-import type { UserConfig } from 'vite';
+import { normalizePath, type UserConfig } from 'vite';
 
-const main = fileURLToPath(new URL('./src/main.tsx', import.meta.url));
+const main = normalizePath(fileURLToPath(new URL('./src/main.tsx', import.meta.url)));
 
 const config: UserConfig = {
   define: { 'process.env.ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS': '"false"' },
