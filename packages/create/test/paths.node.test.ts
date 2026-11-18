@@ -53,7 +53,7 @@ function assetFixture(
 } {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'galaxie-create-assets-')));
   onTestFinished(() => rmSync(root, { recursive: true, force: true }));
-  const directory = join(root, layout === 'checkout' ? 'packages/create' : 'package');
+  const directory = join(root, layout === 'checkout' ? 'packages/create' : 'isolated/package');
   const module = join(directory, layout === 'checkout' ? 'src/paths.ts' : 'dist/paths.ts');
   mkdirSync(dirname(module), { recursive: true });
   copyFileSync(fileURLToPath(new URL('../src/paths.ts', import.meta.url)), module);
@@ -91,6 +91,8 @@ test.each(['templates', 'skills/galaxie'] as const)(
     rmSync(checkout.packed, { recursive: true });
     expect(checkout.run()).toEqual({ status: 0, output: checkout.repository });
     const packed = assetFixture(path, 'packed');
+    mkdirSync(join(packed.repository, 'nested'), { recursive: true });
+    writeFileSync(join(packed.repository, 'nested/content.txt'), 'unrelated nearby repository\n');
     expect(packed.run()).toEqual({ status: 0, output: packed.packed });
   },
 );

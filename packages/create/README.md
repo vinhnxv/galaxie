@@ -86,7 +86,9 @@ exactly one `galaxie-ai-<name>-<version>.tgz` for each of the seven launch packa
 Every direct galaxie dependency and all seven npm overrides use absolute `file:`
 specifications. Third-party pins stay unchanged. Tarball mode prints a one-line notice
 and checks the name and version in each tarball's `package.json` against its file name
-before writing; a mismatch fails with the field and expected value.
+before writing; a mismatch fails with the field and expected value. The reader is a
+consistency check, not a security boundary: it refuses archives with pax or GNU extended
+headers, stops after 512 MiB of decompressed data and reads only `package/package.json`.
 
 Tarball mode supports npm only and refuses pnpm and yarn before writing, including
 with `--no-install`. Their real installs and the pnpm 11 override location are

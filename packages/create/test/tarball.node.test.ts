@@ -3,16 +3,19 @@
 
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { once } from 'node:events';
+import { createReadStream, createWriteStream, existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { PassThrough } from 'node:stream';
+import { PassThrough, Writable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
-import { gzipSync } from 'node:zlib';
+import { createGunzip, createGzip, gzipSync } from 'node:zlib';
 import { expect, onTestFinished, test } from 'vitest';
 import { run } from '../src/main.js';
 import { resolveTarballs } from '../src/packages.js';
+import { defaultMaxDecodedBytes, readTarballManifest } from '../src/tarball.js';
 
 const names = [
   'ui-protocol',
@@ -36,6 +39,7 @@ async function archive(
     await mkdir(join(source, 'package'));
     await writeFile(join(source, 'package/package.json'), JSON.stringify(metadata) ?? 'null');
     execFileSync('tar', [
+      '--format=ustar',
       '-czf',
       join(packed, `galaxie-ai-${name}-${version}.tgz`),
       '-C',
@@ -55,6 +59,156 @@ async function fixture(): Promise<{ root: string; packed: string }> {
   for (const name of names) await archive(packed, name, '0.1.0');
   return { root, packed };
 }
+
+function tarEntry(path: string, bytes: Buffer, type = '0', prefix = ''): Buffer {
+  const header = Buffer.alloc(512);
+  header.write(path, 0, 100);
+  header.write(`${bytes.length.toString(8).padStart(11, '0')}\0`, 124, 12);
+  header.write(type, 156, 1);
+  header.write('ustar\0', 257, 6);
+  header.write(prefix, 345, 155);
+  header.fill(32, 148, 156);
+  const checksum = header.reduce((sum, byte) => sum + byte, 0);
+  header.write(`${checksum.toString(8).padStart(6, '0')}\0 `, 148, 8);
+  return Buffer.concat([header, bytes, Buffer.alloc((512 - (bytes.length % 512)) % 512)]);
+}
+
+test.each([
+  'manifest size',
+  'symlink',
+  'trailing garbage',
+  'later trailing garbage',
+  'missing end marker',
+  'foreign prefix',
+  'x',
+  'g',
+  'L',
+  'K',
+  'decompressed size',
+] as const)('tarball reader rejects %s with a valid archive control', async (problem) => {
+  const root = await mkdtemp(join(tmpdir(), 'galaxie-tar-reader-'));
+  onTestFinished(() => rm(root, { recursive: true, force: true }));
+  const path = join(root, 'fixture.tgz');
+  const metadata = { name: '@galaxie-ai/core', version: '0.1.0' };
+  const entry = tarEntry('package.json', Buffer.from(JSON.stringify(metadata)), '0', 'package');
+  const valid = Buffer.concat([entry, Buffer.alloc(1024)]);
+  await writeFile(path, gzipSync(valid));
+  expect(await readTarballManifest(path, metadata.name)).toEqual(metadata);
+  let invalid: Buffer = valid;
+  if (problem === 'manifest size')
+    invalid = Buffer.concat([
+      tarEntry(
+        'package/package.json',
+        Buffer.from(JSON.stringify({ data: 'a'.repeat(1_048_576) })),
+      ),
+      Buffer.alloc(1024),
+    ]);
+  if (problem === 'symlink')
+    invalid = Buffer.concat([
+      tarEntry('package/package.json', Buffer.from(JSON.stringify(metadata)), '2'),
+      Buffer.alloc(1024),
+    ]);
+  if (problem === 'trailing garbage') invalid = Buffer.concat([valid, Buffer.from('garbage')]);
+  if (problem === 'later trailing garbage')
+    invalid = Buffer.concat([valid, Buffer.alloc(64 * 1024), Buffer.from('garbage')]);
+  if (problem === 'missing end marker') invalid = entry;
+  if (problem === 'foreign prefix')
+    invalid = Buffer.concat([
+      tarEntry('package/package.json', Buffer.from(JSON.stringify(metadata)), '0', 'other'),
+      Buffer.alloc(1024),
+    ]);
+  if (['x', 'g', 'L', 'K'].includes(problem))
+    invalid = Buffer.concat([
+      tarEntry('override', Buffer.from('package/package.json\0'), problem),
+      valid,
+    ]);
+  await writeFile(path, gzipSync(invalid));
+  await expect(
+    readTarballManifest(
+      path,
+      metadata.name,
+      problem === 'decompressed size' ? valid.length - 1 : undefined,
+    ),
+  ).rejects.toThrow(
+    ['x', 'g', 'L', 'K'].includes(problem)
+      ? '@galaxie-ai/core: tarball contains an extended (pax or GNU) header, which this reader refuses.'
+      : '@galaxie-ai/core: could not read tarball package/package.json.',
+  );
+  if (problem === 'decompressed size')
+    expect(await readTarballManifest(path, metadata.name, valid.length)).toEqual(metadata);
+});
+
+async function tarballFile(entries: readonly Buffer[]): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), 'galaxie-tar-reader-'));
+  onTestFinished(() => rm(root, { recursive: true, force: true }));
+  const path = join(root, 'fixture.tgz');
+  await writeFile(path, gzipSync(Buffer.concat([...entries, Buffer.alloc(1024)])));
+  return path;
+}
+
+test('the default decompressed cap is 512 MiB', () => {
+  expect(defaultMaxDecodedBytes).toBe(512 * 1024 * 1024);
+});
+
+test.each([
+  ['1', 'hard link'],
+  ['5', 'directory'],
+  ['7', 'contiguous file'],
+] as const)('the manifest entry cannot have typeflag %s (%s)', async (type, _description) => {
+  const metadata = { name: '@galaxie-ai/core', version: '0.1.0' };
+  const path = await tarballFile([
+    tarEntry('package/package.json', Buffer.from(JSON.stringify(metadata)), type),
+  ]);
+  await expect(readTarballManifest(path, metadata.name)).rejects.toThrow(
+    '@galaxie-ai/core: could not read tarball package/package.json.',
+  );
+});
+
+test('a legacy NUL typeflag still names a regular file', async () => {
+  const metadata = { name: '@galaxie-ai/core', version: '0.1.0' };
+  const path = await tarballFile([
+    tarEntry('package/package.json', Buffer.from(JSON.stringify(metadata)), '\0'),
+  ]);
+  expect(await readTarballManifest(path, metadata.name)).toEqual(metadata);
+});
+
+test('the manifest limit is exactly 1 MiB', async () => {
+  const sized = (size: number): Buffer => {
+    const filler = size - Buffer.byteLength(JSON.stringify({ data: '' }));
+    return Buffer.from(JSON.stringify({ data: 'a'.repeat(filler) }));
+  };
+  const accepted = await tarballFile([tarEntry('package/package.json', sized(1_048_576))]);
+  expect((await readTarballManifest(accepted, 'x'))['data']).toHaveLength(1_048_576 - 11);
+  const refused = await tarballFile([tarEntry('package/package.json', sized(1_048_577))]);
+  await expect(readTarballManifest(refused, 'x')).rejects.toThrow(
+    'x: could not read tarball package/package.json.',
+  );
+});
+
+test('the size cap stops reading instead of decoding the whole archive', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'galaxie-tar-bomb-'));
+  onTestFinished(() => rm(root, { recursive: true, force: true }));
+  const path = join(root, 'bomb.tgz');
+  const gzip = createGzip({ level: 1 });
+  const written = pipeline(gzip, createWriteStream(path));
+  const zeros = Buffer.alloc(1024 * 1024);
+  for (let index = 0; index < 512; index++) if (!gzip.write(zeros)) await once(gzip, 'drain');
+  gzip.end();
+  await written;
+  const full = performance.now();
+  await pipeline(
+    createReadStream(path),
+    createGunzip(),
+    new Writable({ write: (_, __, done) => done() }),
+  );
+  const decodeTime = performance.now() - full;
+  const started = performance.now();
+  await expect(readTarballManifest(path, 'x', 1024 * 1024)).rejects.toThrow(
+    'x: could not read tarball package/package.json.',
+  );
+  // Aborting at 1 MiB takes a small fraction of decoding all 512 MiB.
+  expect(performance.now() - started).toBeLessThan(decodeTime / 4);
+});
 
 test('the npm CLI emits fixed file dependency specs and all seven overrides', async () => {
   const { root, packed } = await fixture();
@@ -347,7 +501,9 @@ test.each(['adapter-pyodide', 'starter-python'])(
 test.each([
   ['name', { name: '@galaxie-ai/react', version: '0.1.0' }],
   ['version', { name: '@galaxie-ai/core', version: '9.9.9' }],
-])('tarball metadata %s mismatch is named before writing', async (field, metadata) => {
+  ['name', { name: 'n'.repeat(200), version: '0.1.0' }],
+  ['version', { name: '@galaxie-ai/core', version: 'v'.repeat(200) }],
+] as const)('tarball metadata %s mismatch is named before writing', async (field, metadata) => {
   const { root, packed } = await fixture();
   await archive(packed, 'core', '0.1.0', metadata);
   const stderr = new PassThrough();
@@ -365,6 +521,7 @@ test.each([
     }),
   ).toBe(1);
   expect(errors).toContain(`@galaxie-ai/core: tarball package.json ${field} mismatch`);
+  expect(errors).toContain(`received ${JSON.stringify(metadata[field]).slice(0, 80)}.\n`);
   expect(existsSync(join(root, 'my-app'))).toBe(false);
 });
 
@@ -397,7 +554,15 @@ test.each(['duplicate', 'truncated'] as const)(
     const tar = join(root, 'core.tar');
     await writeFile(manifest, JSON.stringify({ name: '@galaxie-ai/core', version: '0.1.0' }));
     await writeFile(join(source, 'package/payload.bin'), randomBytes(256 * 1024));
-    execFileSync('tar', ['-cf', tar, '-C', source, 'package/package.json', 'package/payload.bin']);
+    execFileSync('tar', [
+      '--format=ustar',
+      '-cf',
+      tar,
+      '-C',
+      source,
+      'package/package.json',
+      'package/payload.bin',
+    ]);
     if (problem === 'duplicate') {
       await writeFile(manifest, JSON.stringify({ name: '@galaxie-ai/core', version: '9.9.9' }));
       execFileSync('tar', ['-rf', tar, '-C', source, 'package/package.json']);

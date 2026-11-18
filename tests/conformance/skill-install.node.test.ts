@@ -15,7 +15,7 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { expect, onTestFinished, test } from 'vitest';
 import { pythonAffected } from '../../scripts/ci-scope.js';
 import { install } from '../../scripts/install-skill.js';
@@ -140,6 +140,54 @@ test('explicit core version supports a hoisted app with a dependency range', asy
     await tree(join(directory, '.claude/skills/galaxie')),
   );
 });
+
+test('an uninstalled exact declaration prints a notice; explicit and installed versions do not', async () => {
+  const directory = await app();
+  const invoke = (...args: string[]): ReturnType<typeof spawnSync> =>
+    spawnSync(process.execPath, [script, directory, ...args], { encoding: 'utf8' });
+  const declared = invoke();
+  expect(declared.status).toBe(0);
+  expect(declared.stderr.toString()).toContain(
+    'No installed @galaxie-ai/core was found; using the declared exact version without verifying an installation.',
+  );
+  const overridden = invoke('--core-version', skillVersion);
+  expect(overridden.status).toBe(0);
+  expect(overridden.stderr.toString()).toBe('');
+  const core = join(directory, 'node_modules/@galaxie-ai/core');
+  await mkdir(core, { recursive: true });
+  await writeFile(join(core, 'package.json'), JSON.stringify({ version: skillVersion }));
+  const installed = invoke();
+  expect(installed.status).toBe(0);
+  expect(installed.stderr.toString()).toBe('');
+});
+
+test.each(['20.19.0', '22.17.0', '22.18.0'])(
+  'the direct-entry fallback enforces the Node floor for simulated %s',
+  async (version) => {
+    const directory = await app();
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '--eval',
+        `
+      Object.defineProperty(process.versions, 'node', { value: ${JSON.stringify(version)} });
+      process.argv = [process.execPath, ${JSON.stringify(script)}, ${JSON.stringify(directory)}];
+      await import(${JSON.stringify(pathToFileURL(script).href)});
+    `,
+      ],
+      { encoding: 'utf8' },
+    );
+    if (version === '22.18.0') {
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('Installed matching galaxie skill');
+    } else {
+      expect(result.status).toBe(1);
+      expect(result.stderr).toBe('Node >=22.18 is required.\n');
+      expect(await readdir(directory)).toEqual(['package.json']);
+    }
+  },
+);
 
 test('refuses differing contents before writing either destination and replaces only the selected skill', async () => {
   const directory = await app();

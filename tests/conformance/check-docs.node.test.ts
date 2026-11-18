@@ -300,6 +300,30 @@ test('a stray setext underline changes the extent instead of becoming an ordinar
   expect(run(root).output).toContain('citation hash mismatch');
 });
 
+test.each([
+  '- Rule.',
+  '* Rule.',
+  '+ Rule.',
+  '1. Rule.',
+  '1) Rule.',
+  '- Rule.\n  continued line.',
+  '- Rule.\ncontinued lazily.',
+  '> Quote.\nlazy line.',
+  '| a | b |',
+])('a thematic break after list item %s cannot shorten a cited extent', (item) => {
+  const body = `Introduction.\n\n${item}\n---\n\nKeep this too.`;
+  const hash = createHash('sha256').update(body).digest('hex');
+  const source = citedSource.replace(sectionBody, body);
+  const root = citationFixture(source, citation.replace(sectionHash, hash));
+  expect(run(root)).toEqual({ status: 0, output: '' });
+  writeFileSync(join(root, 'rules.md'), source.replace('Keep this too.', 'Changed rule.'));
+  expect(run(root).output).toContain('citation hash mismatch');
+  const shortened = createHash('sha256').update('Introduction.').digest('hex');
+  const forged = run(citationFixture(source, citation.replace(sectionHash, shortened)));
+  expect(forged.status).toBe(1);
+  expect(forged.output).toContain('citation hash mismatch');
+});
+
 test('can cite a setext heading without hashing its underline', () => {
   expect(run(citationFixture(citedSource.replace('## Never', 'Never\n-----')))).toEqual({
     status: 0,
@@ -377,7 +401,7 @@ test.each(['secure', 'secured', 'compliant', 'certified', 'SECURE', 'Certified']
   },
 );
 
-test('masks inline and fenced code for claims, and allows security and compliance nouns', () => {
+test('masks fenced examples and inline words named by a prohibition, and allows nouns', () => {
   const root = fixture({
     [citationFile]: [
       '---',
@@ -387,19 +411,34 @@ test('masks inline and fenced code for claims, and allows security and complianc
       '---',
       '# Guide',
       'Security and compliance are nouns.',
-      '`secure` and ``compliant ` example`` and `certified` and `secured`.',
+      'Never call galaxie or generated',
+      'apps `secure`, `secured`, `compliant` or `certified`.',
       '```md',
       'secure secured compliant certified',
       '```',
       '~~~md',
       'SECURE',
       '~~~',
-      '`multiline',
-      'secure',
-      '`',
     ].join('\n'),
   });
   expect(run(root)).toEqual({ status: 0, output: '' });
+});
+
+test.each([
+  'This app is `secure`.',
+  'This app is ``compliant ` example``.',
+  'This app is `multiline\ncertified\n`.',
+  'Never call this app `secure`. This app is `certified`.',
+  'Do not delete files. This app is `secured`.',
+  'Never call anything `secure`, but galaxie is `certified`.',
+  'Never call anything `secure`; galaxie is `certified`.',
+  'Never call anything `secure` and galaxie is `certified`.',
+  'Never call anything silly but galaxie is `secure`.',
+  'Never call anything silly and galaxie is `secure`.',
+])('inline code cannot hide a claim: %s', (claim) => {
+  const result = run(fixture({ [citationFile]: `# Guide\n\n${claim}\n` }));
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('banned claim:');
 });
 
 test('keeps banned-claim scope to guidance and template Markdown', () => {

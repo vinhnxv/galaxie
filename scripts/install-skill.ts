@@ -44,9 +44,13 @@ function coreVersion(app: string, override: string | undefined): unknown {
       dependencies?: Record<string, unknown>;
       devDependencies?: Record<string, unknown>;
     };
-    return (
-      manifest.dependencies?.['@galaxie-ai/core'] ?? manifest.devDependencies?.['@galaxie-ai/core']
-    );
+    const declared =
+      manifest.dependencies?.['@galaxie-ai/core'] ?? manifest.devDependencies?.['@galaxie-ai/core'];
+    if (typeof declared === 'string' && exactVersion.test(declared))
+      console.warn(
+        'Note: No installed @galaxie-ai/core was found; using the declared exact version without verifying an installation. Pass --core-version with a verified version for hoisted installs.',
+      );
+    return declared;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     return undefined;
@@ -140,7 +144,10 @@ export function install(
   }
 }
 
-if (import.meta.main) {
+if (
+  import.meta.main ||
+  (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url))
+) {
   const usage =
     'Usage: node scripts/install-skill.ts <app-directory> [--core-version <version>] [--replace-skill]';
   const args = process.argv.slice(2);

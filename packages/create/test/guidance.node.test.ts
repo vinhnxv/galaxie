@@ -123,6 +123,27 @@ test('a skill version is required for the managed block', async () => {
   expect(() => renderGuidance(input, selection)).toThrow('version');
 });
 
+test('the total guidance byte limit rejects a synthetic oversized template at 8192 bytes', async () => {
+  const input = new Map(await source);
+  const original = text(input.get('SKILL.md'));
+  const baseline = Buffer.byteLength(text(renderGuidance(input, selection).get('AGENTS.md')));
+  for (const length of [8191, 8192]) {
+    const version = `${'1'.repeat(length - baseline + metadata.version.length - 4)}.0.0`;
+    input.set(
+      'SKILL.md',
+      Buffer.from(original.replace(`version: ${metadata.version}`, `version: ${version}`)),
+    );
+    if (length === 8191)
+      expect(Buffer.byteLength(text(renderGuidance(input, selection).get('AGENTS.md')))).toBe(
+        length,
+      );
+    else
+      expect(() => renderGuidance(input, selection)).toThrow(
+        'Generated AGENTS.md must stay under 8192 bytes.',
+      );
+  }
+});
+
 test('guidance only adds paths through composition and retains collision and path checks', async () => {
   const layers = await loadLayers(join(repo, 'templates'));
   const options = { ...selection, name: 'my-app', mode: 'project', packageManager: 'npm' } as const;

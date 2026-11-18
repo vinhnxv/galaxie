@@ -1031,6 +1031,11 @@ test('template dependency checking combines base, kind and framework declaration
       }),
       'templates/kinds/browser-only/layer.json': templateManifest('browser-only', 'kind', {
         devDependencies: { vite: '1' },
+        peerDependencies: { '@scope/peer': '1' },
+      }),
+      'templates/kinds/gateway/layer.json': templateManifest('gateway', 'kind', {
+        devDependencies: { vite: '1' },
+        peerDependencies: { '@scope/peer': '1' },
       }),
       'templates/frameworks/langgraph-js/layer.json': templateManifest(
         'langgraph-js',
@@ -1038,13 +1043,22 @@ test('template dependency checking combines base, kind and framework declaration
         { dependencies: { '@scope/library': '1' } },
       ),
       'templates/frameworks/langgraph-js/files/src/extra.ts':
-        "import 'react/jsx-runtime'; import '@scope/library/subpath'; import 'node:fs'; import './local.js';",
+        "import 'react/jsx-runtime'; import 'vite'; import '@scope/peer/subpath'; import '@scope/library/subpath'; import 'node:fs'; import './local.js';",
       'templates/kinds/browser-only/files/vite.config.ts':
         "import type { UserConfig } from 'vite';",
       'templates/frameworks/langgraph-js/workspace/test/extra.node.test.ts':
         "import { test } from 'vitest';",
     }),
   ).toEqual({ status: 0, output: '' });
+});
+
+test('workspace imports must be declared even though workspace test tooling is exempt', () => {
+  const path = 'templates/frameworks/langgraph-js/workspace/test/extra.node.test.ts';
+  const result = run({ [path]: "import 'vitest'; import 'undeclared/subpath';" });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(
+    `${path}: template import undeclared/subpath is not declared by the selected layer manifests (browser-only/langgraph-js)`,
+  );
 });
 
 test('a dependency in another framework cannot satisfy a template import', () => {

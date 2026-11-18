@@ -24,7 +24,12 @@ import { ProjectWriteError, planWrite, writeProject } from '../src/write.js';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
-  return { ...actual, unlink: vi.fn(actual.unlink), rmdir: vi.fn(actual.rmdir) };
+  return {
+    ...actual,
+    open: vi.fn(actual.open),
+    unlink: vi.fn(actual.unlink),
+    rmdir: vi.fn(actual.rmdir),
+  };
 });
 
 const files = (values: Record<string, string>): Map<string, ProjectFile> =>
@@ -155,6 +160,31 @@ test('a symlink in the middle of an existing target path is refused (base-relati
   await expect(lstat(join(outside, 'sub', 'proj'))).rejects.toThrow();
 });
 
+test('rollback names directories created above the target by role, not by path', async () => {
+  const root = await scratch();
+  const plan = await planWrite(files({ 'x.ts': 'x', 'y.ts': 'y' }), join(root, 'a', 'b', 'proj'));
+  const failure = Object.assign(new Error('private-error-canary'), { code: 'EACCES' });
+  const open = vi.mocked(fs.open);
+  const real = open.getMockImplementation();
+  let calls = 0;
+  open.mockImplementation(async (...args: Parameters<typeof fs.open>) => {
+    calls += 1;
+    if (calls === 2) throw new Error('second file cannot be created');
+    return (real as typeof fs.open)(...args);
+  });
+  const remove = vi.mocked(fs.rmdir).mockRejectedValue(failure);
+  onTestFinished(() => {
+    open.mockImplementation(real as typeof fs.open);
+    remove.mockReset();
+  });
+  const message = ((await writeProject(plan).catch((error: unknown) => error)) as Error).message;
+  expect(message).toContain(
+    'Rollback could not remove: . (EACCES), <parent directory> (EACCES), <parent directory> (EACCES)',
+  );
+  expect(message).not.toContain('..');
+  expect(message).not.toContain(await realpath(root));
+});
+
 test.each(['unlink', 'rmdir'] as const)(
   'rollback %s failures retain the original error and name leftover paths',
   async (operation) => {
@@ -169,14 +199,40 @@ test.each(['unlink', 'rmdir'] as const)(
     const error = await writeProject(plan).catch((error: unknown) => error);
     expect(error).toBeInstanceOf(ProjectWriteError);
     expect((error as Error).message).toContain(
-      `Rollback could not remove: ${join(await realpath(root), operation === 'unlink' ? 'child/a.ts' : 'child')} (EACCES)`,
+      `Rollback could not remove: ${operation === 'unlink' ? 'child/a.ts' : 'child'} (EACCES)`,
     );
     expect((error as Error).message).toContain('without replacing an existing path');
     expect((error as Error).message).not.toContain('private-error-canary');
+    expect((error as Error).message).not.toContain(await realpath(root));
     expect((error as Error).cause).toBeInstanceOf(AggregateError);
     if (operation === 'unlink')
       expect(await readFile(join(root, 'child/a.ts'), 'utf8')).toBe('created');
     else expect(await readdir(join(root, 'child'))).toEqual([]);
+    expect(await readFile(join(root, 'z.ts'), 'utf8')).toBe('concurrent');
+  },
+);
+
+test.each(['unlink', 'rmdir'] as const)(
+  'rollback ignores an already removed path during %s',
+  async (operation) => {
+    const root = await scratch();
+    const plan = await planWrite(files({ 'child/a.ts': 'created', 'z.ts': 'new' }), root);
+    await writeFile(join(root, 'z.ts'), 'concurrent');
+    const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const remove = vi.mocked(fs[operation]).mockImplementationOnce(async (path) => {
+      await actual[operation](path);
+      throw Object.assign(new Error('already removed'), { code: 'ENOENT' });
+    });
+    onTestFinished(() => {
+      remove.mockReset();
+    });
+    const error = await writeProject(plan).catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(ProjectWriteError);
+    expect((error as Error).message).toBe(
+      'The project could not be written without replacing an existing path.',
+    );
+    expect((error as Error).cause).not.toBeInstanceOf(AggregateError);
+    expect(await readdir(root)).toEqual(['z.ts']);
     expect(await readFile(join(root, 'z.ts'), 'utf8')).toBe('concurrent');
   },
 );
